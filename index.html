@@ -669,9 +669,28 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     function mergeSegmentsNoDup(arr){
       let acc='';
       for(const raw of arr){
-        let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim(); if(!s) continue;
+        let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
+        if(!s) continue;
         if(!acc){ acc=s; continue; }
-        const tail = acc.split(' ').slice(-8).join(' ').trim();
+
+        const accTokens = acc.split(' ');
+        const sTokens = s.split(' ');
+        let merged=false;
+
+        for(let k=Math.min(sTokens.length, accTokens.length); k>0; k--){
+          const tailStr = accTokens.slice(-k).join(' ');
+          const headStr = sTokens.slice(0,k).join(' ');
+          const valTail = Number(extractNumberRu(tailStr));
+          const valHead = Number(extractNumberRu(headStr));
+          if(!isNaN(valTail) && !isNaN(valHead) && valTail===valHead){
+            acc = accTokens.slice(0,-k).concat(sTokens).join(' ');
+            merged=true;
+            break;
+          }
+        }
+        if(merged) continue;
+
+        const tail = accTokens.slice(-8).join(' ').trim();
         if (tail && s.startsWith(tail)) acc = acc + s.slice(tail.length);
         else if (!acc.endsWith(s)) acc = acc + ' ' + s;
       }
