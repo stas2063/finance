@@ -479,41 +479,8 @@ function fixNaMultiplication(str){
   return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b','gi'), '$1 * $2');
 }
 
-// "* X, Y" / "* X и Y" → "* X * Y" (списки множителей после "*")
-function expandMultiplicativeList(str){
-  return str.replace(/(\*)(\s*)([^+\-*/]+)/g, (m, star, sp, tail)=>{
-    const parts = tail
-      .replace(/[,;]+/g, ' и ')
-      .split(/\s+и\s+/)
-      .map(s => s.trim())
-      .filter(Boolean);
-    if (parts.length <= 1) return m;
-    const isNumWord = t => {
-      t = t.toLowerCase();
-      return /^\d+(?:[.,]\d+)?$/.test(t) ||
-             UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
-             /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
-    };
-    const ok = parts.every(p => p.split(/\s+/).every(isNumWord));
-    if (!ok) return m;
-    return star + ' ' + parts.join(' * ');
-  });
-}
-
-// "* 5 3" / "* пять три" → "* 5 * 3" / "* пять * три" (быстрая замена)
-function insertStarsBetweenBareNumbers(str){
-  // цифры после "*"
-  str = str.replace(/(\*)\s*((?:\d+(?:[.,]\d+)?\s+){1,}\d+(?:[.,]\d+)?)/g,
-    (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
-  // слова-единицы после "*"
-  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
-  str = str.replace(new RegExp('(\\*)\\s*((?:' + unit + '\\s+){1,}' + unit + ')', 'gi'),
-    (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
-  return str;
-}
-
-// После "*" если идут «голые» числа подряд (без «и/на»), вставляем "*":
-// "* 5 3" → "* 5 * 3", "* пять три" → "* пять * три".
+// После "*" если идут «голые» числа или списки через запятую/«и/на», вставляем "*" между ними.
+// "* 5 3" → "* 5 * 3", "* пять, три" → "* пять * три".
 // Не ломает составные "двадцать три": десятки/сотни/масштабы не считаются «атомарными».
 function insertStarsAfterStar(str){
   const toks = String(str).split(/\s+/).filter(Boolean);
@@ -528,7 +495,10 @@ function insertStarsAfterStar(str){
            /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
   };
   for (let i=0; i<toks.length; i++){
-    const tok = toks[i];
+    let tok = toks[i];
+    let clean = tok.replace(/[,;]+$/, '');
+    const hadSep = clean.length !== tok.length; // был разделитель в конце
+    tok = clean;
     const low = tok.toLowerCase();
     if (tok==='*'){
       out.push(tok);
@@ -543,16 +513,18 @@ function insertStarsAfterStar(str){
       continue;
     }
     if (!afterStar){
-      out.push(tok);
+      if (tok) out.push(tok);
       continue;
     }
     // внутри хвоста после "*": разделители/союзы
     if (low==='и' || low==='на'){
       out.push('*');
       prevAtomic=false;
+      if (hadSep){ out.push('*'); }
       continue;
     }
-    if (tok===',' || tok===';'){
+    if (!tok){
+      out.push('*');
       prevAtomic=false;
       continue;
     }
@@ -562,8 +534,11 @@ function insertStarsAfterStar(str){
       out.push('*');
     }
     out.push(tok);
-    // после десятков/сотен/масштабов НЕ считаем «атомарным», чтобы "двадцать три" не стало "двадцать * три"
     prevAtomic = atomic && !tensHundScale;
+    if (hadSep){
+      out.push('*');
+      prevAtomic=false;
+    }
   }
   return out.join(' ');
 }
@@ -597,11 +572,7 @@ function parseExpression(textRaw){
 
   // 1) «X на Y» даже без «умножь»
   t = fixNaMultiplication(t);
-  // 2) Списки множителей после "*" с запятыми/«и»
-  t = expandMultiplicativeList(t);
-  // 3) "* 5 3" / "* пять три" → вставить "*" между голыми числами
-  t = insertStarsBetweenBareNumbers(t);
-  // 4) Хвост после "*": дополнительно страхуемся через токены
+  // 2) Хвост после "*": множители через пробел/"и"/запятую
   t = insertStarsAfterStar(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
