@@ -479,6 +479,27 @@ function fixNaMultiplication(str){
   return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b','gi'), '$1 * $2');
 }
 
+// "* X, Y" / "* X и Y" → "* X * Y" (списки множителей после "*")
+function expandMultiplicativeList(str){
+  return str.replace(/(\*)(\s*)([^+\-*/]+)/g, (m, star, sp, tail)=>{
+    const parts = tail
+      .replace(/[,;]+/g, ' и ')
+      .split(/\s+и\s+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (parts.length <= 1) return m;
+    const isNumWord = t => {
+      t = t.toLowerCase();
+      return /^\d+(?:[.,]\d+)?$/.test(t) ||
+             UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
+             /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
+    };
+    const ok = parts.every(p => p.split(/\s+/).every(isNumWord));
+    if (!ok) return m;
+    return star + ' ' + parts.join(' * ');
+  });
+}
+
 // После "*" если идут «голые» числа подряд (без «и/на»), вставляем "*":
 // "* 5 3" → "* 5 * 3", "* пять три" → "* пять * три".
 // Не ломает составные "двадцать три": десятки/сотни/масштабы не считаются «атомарными».
@@ -564,7 +585,9 @@ function parseExpression(textRaw){
 
   // 1) «X на Y» даже без «умножь»
   t = fixNaMultiplication(t);
-  // 2) Хвост после "*": "* 5 3" → "* 5 * 3" и "* пять три" → "* пять * три"
+  // 2) Списки множителей после "*" с запятыми/«и»
+  t = expandMultiplicativeList(t);
+  // 3) Хвост после "*": "* 5 3" → "* 5 * 3" и "* пять три" → "* пять * три"
   t = insertStarsAfterStar(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
