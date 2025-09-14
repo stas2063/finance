@@ -317,25 +317,27 @@
 
       let total = 0;  // сумма по масштабам
       let group = 0;  // текущая группа (<=999)
+      let matched = false;
 
       for (let w of tokens){
         if (w === 'и') continue;
 
-        if (/^\d+$/.test(w)) { group += parseInt(w,10); continue; }
-        if (w === 'полтора' || w === 'полторы') { group += 1.5; continue; }
+        if (/^\d+$/.test(w)) { group += parseInt(w,10); matched=true; continue; }
+        if (w === 'полтора' || w === 'полторы') { group += 1.5; matched=true; continue; }
 
-        if (HUNS[w]  !== undefined) { group += HUNS[w];  continue; }
-        if (TENS[w]  !== undefined) { group += TENS[w];  continue; }
-        if (UNITS[w] !== undefined) { group += UNITS[w]; continue; }
+        if (HUNS[w]  !== undefined) { group += HUNS[w];  matched=true; continue; }
+        if (TENS[w]  !== undefined) { group += TENS[w];  matched=true; continue; }
+        if (UNITS[w] !== undefined) { group += UNITS[w]; matched=true; continue; }
 
         if (SCALE[w] !== undefined){
           if (group === 0) group = 1;          // «миллион» без числа → 1*
           total += group * SCALE[w];
           group = 0;
+          matched = true;
           continue;
         }
       }
-      return total + group;
+      return matched ? total + group : NaN;
     }
 
     function extractNumberRu(input){
@@ -446,7 +448,8 @@
         return String(parseFloat(s.replace(',', '.')));
 
       // слова → число с масштабами
-      return String(wordsToNumber(s));
+      const num = wordsToNumber(s);
+      return isNaN(num) ? s : String(num);
     }
 
     /* ===== Форматирование вывода ===== */
@@ -476,7 +479,7 @@ function splitListForMultiply(s){
   // Не трогаем дробные формулировки «три целых и пять десятых»
   const fracGuard = /(\bцел(ых|ая|ое)\b|\bдесят(ых|ая|ую)\b|\bсот(ых|ая|ую)\b|\bтысячн(ых|ая|ую)\b|\bдесятитысячн(ых|ая|ую)\b|\bстотысячн(ых|ая|ую)\b|\bмиллионн(ых|ая|ую)\b|\bмиллиардн(ых|ая|ую)\b)/i;
   if (fracGuard.test(s)) return null;
-  const chunks = s.split(/\s*(?:и|,|;)\s*/i).filter(Boolean);
+  const chunks = s.split(/\s*(?:и\s+|[,;]\s*)/i).filter(Boolean);
   if (chunks.length < 2) return null;
   const nums = [];
   for (const ch of chunks){
@@ -506,9 +509,11 @@ function parseExpression(textRaw){
   t = normalizeNumeralTypos(t)
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
+    .replace(/(^|[^a-zа-яё])(умнож[а-я]*)(?=($|[^a-zа-яё]))/gi,'$1 * ')
+    .replace(/(^|[^a-zа-яё])(помнож[а-я]*)(?=($|[^a-zа-яё]))/gi,'$1 * ')
     .replace(/(раздели|разделить|подели|дели)\s+на/g,' / ')
-    .replace(/\bплюс\b/g,' + ')
-    .replace(/\bминус\b/g,' - ')
+    .replace(/(^|[^a-zа-яё0-9])плюс(?=($|[^a-zа-яё0-9]))/gi,'$1 + ')
+    .replace(/(^|[^a-zа-яё0-9])минус(?=($|[^a-zа-яё0-9]))/gi,'$1 - ')
     // безопасная подмена знака умножения — только между цифрами
     .replace(/(\d)\s*[×xх]\s*(\d)/g, function(_, a, b){ return a + ' * ' + b; })
     .replace(/[÷:]/g,'/')
@@ -528,7 +533,7 @@ function parseExpression(textRaw){
     let s=part.trim();
 
     if(['+','-','*','/'].includes(s)){
-      if (s==='-' && (out.length===0 || ['+','-','*','/','('].includes(out[outlength-1]))) { pendingUnaryMinus=true; continue; }
+      if (s==='-' && (out.length===0 || ['+','-','*','/','('].includes(out[out.length-1]))) { pendingUnaryMinus=true; continue; }
       out.push(s); disp.push(' ' + s + ' '); continue;
     }
 
@@ -614,7 +619,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     function mergeSegmentsNoDup(arr){
       let acc='';
       for(const raw of arr){
-        let s=String(raw||'').replace(/\s+/g,' ').trim(); if(!s) continue;
+        let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim(); if(!s) continue;
         if(!acc){ acc=s; continue; }
         const tail = acc.split(' ').slice(-8).join(' ').trim();
         if (tail && s.startsWith(tail)) acc = acc + s.slice(tail.length);
