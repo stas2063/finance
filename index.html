@@ -470,48 +470,29 @@
     }
 
     /* ===== Разбор выражения ===== */
-// «X на Y» → «X * Y» и разворачивание перечислений после «*»
+// 1) "X на Y" → "X * Y" даже без слова "умножить"
 function fixNaMultiplication(str){
-  // «12 на 3» → «12 * 3»
+  // цифры: "12 на 3" → "12 * 3"
   str = str.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/gi, '$1 * $2');
-  // «пять на три» → «пять * три» (сотни/тысячи/миллионы тоже)
-  const w = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
+  // простые слова-единицы: "пять на три" → "пять * три"
+  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
+  const w = unit + '|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*';
   return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b', 'gi'), '$1 * $2');
 }
 
-function expandMultiplicativeList(str){
-  // "* пять и три" / "* 5, 3" / "* пять, три" → "* пять * три"
-  return str.replace(/(\*)(\s*)([^+\-*/]+)/g, (m, star, sp, tail) => {
-    let parts = tail
-      .replace(/[,;]+/g, ' и ')
-      .split(/\s+и\s+/)
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    if (parts.length <= 1){
-      const tokens = tail.trim().split(/\s+/).filter(Boolean);
-      if (tokens.length <= 1) return m;
-      const isNumWord = t => {
-        t = t.toLowerCase();
-        return /^\d+(?:[.,]\d+)?$/.test(t) ||
-               UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
-               /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
-      };
-      if (!tokens.every(isNumWord)) return m;
-      parts = tokens;
-    }
-
-    const isNumWord = t => {
-      t = t.toLowerCase();
-      return /^\d+(?:[.,]\d+)?$/.test(t) ||
-             UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
-             /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
-    };
-    const ok = parts.every(p => p.split(/\s+/).every(isNumWord));
-    if (!ok) return m;
-
-    return star + ' ' + parts.join(' * ');
-  });
+// 2) После "*": если идут несколько чисел подряд (без "и"/"на"),
+// вставляем "*" между ними, чтобы не вышло сложение 5+3.
+function insertStarsBetweenBareNumbers(str){
+  // цифры после "*": "* 5 3" → "* 5 * 3"
+  str = str.replace(/(\*)\s*((?:\d+(?:[.,]\d+)?\s+){1,}\d+(?:[.,]\d+)?)/g, (_, star, seq) =>
+    star + ' ' + seq.trim().replace(/\s+/g, ' * ')
+  );
+  // единичные числительные словами после "*": "* пять три" → "* пять * три"
+  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
+  str = str.replace(new RegExp('(\\*)\\s*((?:' + unit + '\\s+){1,}' + unit + ')', 'gi'), (_, star, seq) =>
+    star + ' ' + seq.trim().replace(/\s+/g, ' * ')
+  );
+  return str;
 }
 
 function parseExpression(textRaw){
@@ -544,7 +525,7 @@ function parseExpression(textRaw){
     .trim();
 
   t = fixNaMultiplication(t);
-  t = expandMultiplicativeList(t);
+  t = insertStarsBetweenBareNumbers(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
   const out=[], disp=[];
