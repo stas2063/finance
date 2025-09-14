@@ -217,6 +217,7 @@
     function moveTo(x){ const dx=x-startX; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
     function endDrag(e){
       if(!dragging) return;
+      e.preventDefault();
       e.currentTarget.releasePointerCapture?.(e.pointerId);
       dragging=false;
       const opened=1+pos/w;
