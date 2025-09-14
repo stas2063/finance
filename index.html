@@ -31,6 +31,10 @@
     h1{ margin:12px 0 8px; font-size:28px; font-weight:800; }
     #status{ color:var(--muted); min-height:24px; margin:0 0 12px; display:flex; align-items:center; justify-content:center; text-align:center; }
 
+    /* Строка распознанного текста — прокручиваемая горизонтально */
+    #expr{ font-weight:600; font-size:28px; min-height:32px; margin:0 0 6px; white-space:nowrap; overflow-x:auto; overflow-y:hidden; text-align:right; }
+    #expr::-webkit-scrollbar{ display:none; }
+
     /* Большая строка результата — справа, плавно масштабируется, при переполнении «уезжает» влево */
     #full{ font-weight:800; font-size:64px; color:var(--primary); min-height:56px; margin:8px 0 18px; white-space:nowrap; overflow:hidden; line-height:1.1; text-align:right; will-change:font-size,transform; transition: font-size .18s ease, transform .18s ease; }
     #full[data-overflow="1"]{ -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,.12) 16px, #000 44px); mask-image: linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,.12) 16px, #000 44px); }
@@ -97,6 +101,7 @@
           <h1>Голосовой калькулятор</h1>
           <p id="status"></p>
         </div>
+        <div id="expr"></div>
         <div id="full"></div>
         <div class="center">
           <button id="btnListen" class="btn circle"><span class="title" id="btnTitle">НАЖМИ</span></button>
@@ -621,7 +626,7 @@ function parseExpression(textRaw){
 const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+')+')')(); if(!isFinite(v)||isNaN(v)) throw 0; return parseFloat(Number(v).toFixed(4)).toString(); };
 
     /* ===== UI helpers ===== */
-    const UI={ status:$('#status'), full:$('#full'), btnTitle:$('#btnTitle'),
+    const UI={ status:$('#status'), expr:$('#expr'), full:$('#full'), btnTitle:$('#btnTitle'),
       setListening(on){ this.status.innerHTML = on? '<div class="dots"><span></span><span></span><span></span></div>' : ''; if(this.btnTitle) this.btnTitle.textContent = on? 'ГОВОРИ' : 'НАЖМИ'; },
       msg(m){ if(this.status) this.status.textContent=m; }
     };
@@ -663,8 +668,12 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
         const {display,sanitized}=parseExpression(phrase);
         const out=calc(sanitized); const outFmt=formatNumberSpaces(out);
         lastPreview = { display, out: outFmt };
-        fitFullText(`${display} = ${outFmt}`);
-      }catch{ UI.full.textContent = phrase; }
+        if(UI.expr){ UI.expr.textContent = display; UI.expr.scrollLeft = UI.expr.scrollWidth; }
+        fitFullText(outFmt);
+      }catch{
+        if(UI.expr){ UI.expr.textContent = phrase; UI.expr.scrollLeft = UI.expr.scrollWidth; }
+        fitFullText('');
+      }
     }
 
     /* ===== Вспомогательная склейка сегментов без дублей ===== */
@@ -739,7 +748,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
         rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; if(getMode()==='cont'){ setTimeout(()=>{ try{ rec.start(); }catch{} }, 120); } else { stopSession(); } };
       }
 
-      function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); buffer=''; configure(); try{ rec.start(); }catch{} }
+      function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr) UI.expr.textContent=''; buffer=''; configure(); try{ rec.start(); }catch{} }
       function stopSession(){ if(!sessionActive) return; sessionActive=false; clearSilence(); try{ rec && rec.stop(); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
 
       recognizer.mode='web'; recognizer.available=true;
@@ -771,7 +780,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           }, ()=>{ if(sessionActive){ setTimeout(loopStart, 150); } }, { language:'ru-RU', matches:8, showPartial:true, showPopup:false });
         }
 
-        function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); buffer=''; lastChunk='';
+        function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr) UI.expr.textContent=''; buffer=''; lastChunk='';
           rec.hasPermission(has=>{ const go=()=>{ loopStart(); }; if(has) go(); else rec.requestPermission(go, ()=> UI.msg('Нет доступа к микрофону.')); }, ()=> UI.msg('Ошибка проверки разрешений.'));
         }
         function stopSession(){ clearSilence(); if(!sessionActive) return; sessionActive=false; try{ rec.stopListening(()=>{},()=>{}); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
