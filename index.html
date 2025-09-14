@@ -73,9 +73,9 @@
 
     .field{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .label{ color:var(--muted); font-weight:600; }
-    .theme-toggle, .mode-toggle{ display:inline-flex; background:var(--input-bg); border:1px solid var(--divider); padding:4px; border-radius:14px; box-shadow: inset 0 2px 6px rgba(0,0,0,.06); }
-    .theme-toggle button, .mode-toggle button{ appearance:none; border:0; background:transparent; padding:8px 12px; border-radius:10px; font-weight:700; color:var(--fg); cursor:pointer; transition:transform .08s ease; }
-    .theme-toggle button.active, .mode-toggle button.active{ background:var(--primary); color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.25); }
+    .theme-toggle{ display:inline-flex; background:var(--input-bg); border:1px solid var(--divider); padding:4px; border-radius:14px; box-shadow: inset 0 2px 6px rgba(0,0,0,.06); }
+    .theme-toggle button{ appearance:none; border:0; background:transparent; padding:8px 12px; border-radius:10px; font-weight:700; color:var(--fg); cursor:pointer; transition:transform .08s ease; }
+    .theme-toggle button.active{ background:var(--primary); color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.25); }
 
     .dots span{ display:inline-block; width:8px; height:8px; background:var(--primary); border-radius:50%; margin:0 3px; animation:b 1.4s infinite ease-in-out both; }
     .dots span:nth-child(1){ animation-delay:-.32s } .dots span:nth-child(2){ animation-delay:-.16s }
@@ -124,13 +124,6 @@
             <div id="themeToggle" class="theme-toggle" role="group" aria-label="Тема">
               <button type="button" data-value="light">Светлая</button>
               <button type="button" data-value="dark">Тёмная</button>
-            </div>
-          </div>
-          <div class="field">
-            <span class="label">Режим распознавания</span>
-            <div id="modeToggle" class="mode-toggle" role="group" aria-label="Режим">
-              <button type="button" data-value="auto">Автостоп (по тишине)</button>
-              <button type="button" data-value="cont">Непрерывный</button>
             </div>
           </div>
         </div>
@@ -192,14 +185,7 @@
       if(themeToggle){ themeToggle.addEventListener('click', (e)=>{ const btn=e.target.closest('button[data-value]'); if(!btn) return; const v=btn.dataset.value; localStorage.setItem(THEME_KEY,v); applyTheme(v); setThemeUI(v); }); }
     })();
 
-    /* ===== Режим распознавания ===== */
-    const MODE_KEY='app.rec.mode';
-    const modeToggle=$('#modeToggle');
-    function setModeUI(v){ if(!modeToggle) return; modeToggle.querySelectorAll('button').forEach(btn=>btn.classList.toggle('active', btn.dataset.value===v)); }
-    function getMode(){ return localStorage.getItem(MODE_KEY) || 'auto'; }
-    (function initMode(){ const m=getMode(); setModeUI(m); if(modeToggle){ modeToggle.addEventListener('click', (e)=>{ const b=e.target.closest('button[data-value]'); if(!b) return; const v=b.dataset.value; localStorage.setItem(MODE_KEY,v); setModeUI(v); }); }})();
-
-    /* ===== Шторка (жесты) ===== */
+      /* ===== Шторка (жесты) ===== */
     const drawer=$('#drawer'), scrim=$('#scrim'), btnMenu=$('#btnMenu'), edge=$('#edge');
     let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300;
     const measure=()=>{ w=drawer.getBoundingClientRect().width||280; };
@@ -752,15 +738,14 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
 
       const looksIncomplete = (txt)=>/(\b(?:с|и)\s*половин)|\b[01]?\s*\/\s*2\b/i.test(txt);
       function clearSilence(){ if(silenceTimer){ clearTimeout(silenceTimer); silenceTimer=null; } }
-      function armSilence(){ clearSilence(); if(getMode()==='auto'){ silenceTimer=setTimeout(()=>{ try{ rec && rec.stop(); }catch{} }, 1500); } }
+        function armSilence(){ clearSilence(); silenceTimer=setTimeout(()=>{ try{ rec && rec.stop(); }catch{} }, 1500); }
 
-      function configure(){
-        const m=getMode();
-        rec = new SR();
-        rec.lang='ru-RU';
-        rec.interimResults=true;
-        rec.maxAlternatives=16;
-        rec.continuous = (m==='cont');
+        function configure(){
+          rec = new SR();
+          rec.lang='ru-RU';
+          rec.interimResults=true;
+          rec.maxAlternatives=16;
+          rec.continuous = false;
 
         rec.onresult = (e)=>{
           const results = Array.from(e.results||[]);
@@ -773,8 +758,8 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           if(joined){ buffer = joined; updateLive(buffer); }
           if(!looksIncomplete(joined)) armSilence(); else clearSilence();
         };
-        rec.onerror = ()=>{ if(sessionActive){ if(getMode()==='cont'){ setTimeout(()=>{ try{ rec.stop(); rec.start(); }catch{} }, 200); } else { stopSession(); } } };
-        rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; if(getMode()==='cont'){ setTimeout(()=>{ try{ rec.start(); }catch{} }, 120); } else { stopSession(); } };
+          rec.onerror = ()=>{ if(sessionActive){ stopSession(); } };
+          rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; stopSession(); };
       }
 
         function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; configure(); try{ rec.start(); }catch{} }
@@ -793,7 +778,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
 
         let buffer=''; let silenceTimer=null; let lastChunk='';
         function clearSilence(){ if(silenceTimer){ clearTimeout(silenceTimer); silenceTimer=null; } }
-        function armSilence(){ clearSilence(); if(getMode()==='auto'){ silenceTimer=setTimeout(()=>{ stopSession(); }, 1500); } }
+          function armSilence(){ clearSilence(); silenceTimer=setTimeout(()=>{ stopSession(); }, 1500); }
 
         function loopStart(){
           if(!sessionActive) return;
@@ -805,7 +790,6 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
               updateLive(buffer);
               if(/(с\s*половин|1\s*\/\s*2|½)/i.test(buffer)) clearSilence(); else armSilence();
             }
-            if(getMode()==='cont') loopStart();
           }, ()=>{ if(sessionActive){ setTimeout(loopStart, 150); } }, { language:'ru-RU', matches:8, showPartial:true, showPopup:false });
         }
 
