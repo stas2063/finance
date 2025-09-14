@@ -480,7 +480,13 @@ function splitListForMultiply(s){
   const fracGuard = /(\bцел(ых|ая|ое)\b|\bдесят(ых|ая|ую)\b|\bсот(ых|ая|ую)\b|\bтысячн(ых|ая|ую)\b|\bдесятитысячн(ых|ая|ую)\b|\bстотысячн(ых|ая|ую)\b|\bмиллионн(ых|ая|ую)\b|\bмиллиардн(ых|ая|ую)\b)/i;
   if (fracGuard.test(s)) return null;
   const chunks = s.split(/\s*(?:и\s+|[,;]\s*)/i).filter(Boolean);
-  if (chunks.length < 2) return null;
+  if (chunks.length < 2){
+    const tokens = s.trim().split(/\s+/);
+    if (tokens.length < 2) return null;
+    const simple=/^(?:\d|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)$/;
+    if(!tokens.every(t=>simple.test(t))) return null;
+    return tokens.map(t=>extractNumberRu(t));
+  }
   const nums = [];
   for (const ch of chunks){
     const v = extractNumberRu(ch);
