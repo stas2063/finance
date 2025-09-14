@@ -500,6 +500,18 @@ function expandMultiplicativeList(str){
   });
 }
 
+// "* 5 3" / "* пять три" → "* 5 * 3" / "* пять * три" (быстрая замена)
+function insertStarsBetweenBareNumbers(str){
+  // цифры после "*"
+  str = str.replace(/(\*)\s*((?:\d+(?:[.,]\d+)?\s+){1,}\d+(?:[.,]\d+)?)/g,
+    (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
+  // слова-единицы после "*"
+  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
+  str = str.replace(new RegExp('(\\*)\\s*((?:' + unit + '\\s+){1,}' + unit + ')', 'gi'),
+    (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
+  return str;
+}
+
 // После "*" если идут «голые» числа подряд (без «и/на»), вставляем "*":
 // "* 5 3" → "* 5 * 3", "* пять три" → "* пять * три".
 // Не ломает составные "двадцать три": десятки/сотни/масштабы не считаются «атомарными».
@@ -587,7 +599,9 @@ function parseExpression(textRaw){
   t = fixNaMultiplication(t);
   // 2) Списки множителей после "*" с запятыми/«и»
   t = expandMultiplicativeList(t);
-  // 3) Хвост после "*": "* 5 3" → "* 5 * 3" и "* пять три" → "* пять * три"
+  // 3) "* 5 3" / "* пять три" → вставить "*" между голыми числами
+  t = insertStarsBetweenBareNumbers(t);
+  // 4) Хвост после "*": дополнительно страхуемся через токены
   t = insertStarsAfterStar(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
