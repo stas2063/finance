@@ -470,62 +470,101 @@
     }
 
     /* ===== Разбор выражения ===== */
-// 1) "X на Y" → "X * Y" даже без слова "умножить"
+// "X на Y" → "X * Y" (когда ASR съел слово «умножь»)
 function fixNaMultiplication(str){
   // цифры: "12 на 3" → "12 * 3"
   str = str.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/gi, '$1 * $2');
-  // простые слова-единицы: "пять на три" → "пять * три"
-  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
-  const w = unit + '|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*';
-  return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b', 'gi'), '$1 * $2');
+  // слова (включая десятки/сотни/масштабы): "пять на три" → "пять * три"
+  const w = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
+  return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b','gi'), '$1 * $2');
 }
 
-// 2) После "*": если идут несколько чисел подряд (без "и"/"на"),
-// вставляем "*" между ними, чтобы не вышло сложение 5+3.
-function insertStarsBetweenBareNumbers(str){
-  // цифры после "*": "* 5 3" → "* 5 * 3"
-  str = str.replace(/(\*)\s*((?:\d+(?:[.,]\d+)?\s+){1,}\d+(?:[.,]\d+)?)/g, (_, star, seq) =>
-    star + ' ' + seq.trim().replace(/\s+/g, ' * ')
-  );
-  // единичные числительные словами после "*": "* пять три" → "* пять * три"
-  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
-  str = str.replace(new RegExp('(\\*)\\s*((?:' + unit + '\\s+){1,}' + unit + ')', 'gi'), (_, star, seq) =>
-    star + ' ' + seq.trim().replace(/\s+/g, ' * ')
-  );
-  return str;
+// После "*" если идут «голые» числа подряд (без «и/на»), вставляем "*":
+// "* 5 3" → "* 5 * 3", "* пять три" → "* пять * три".
+// Не ломает составные "двадцать три": десятки/сотни/масштабы не считаются «атомарными».
+function insertStarsAfterStar(str){
+  const toks = String(str).split(/\s+/).filter(Boolean);
+  const out = [];
+  let afterStar = false;
+  let prevAtomic = false; // предыдущий токен после "*" был атомарным (цифра или слово-единица)
+  const isDigitTok = t => /^\d+(?:[.,]\d+)?$/.test(t);
+  const isUnitTok = t => UNITS[t.toLowerCase()] !== undefined; // один.. девять, десять.. девятнадцать
+  const isTensOrHundOrScale = t => {
+    t = t.toLowerCase();
+    return TENS[t] !== undefined || HUNS[t] !== undefined ||
+           /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
+  };
+  for (let i=0; i<toks.length; i++){
+    const tok = toks[i];
+    const low = tok.toLowerCase();
+    if (tok==='*'){
+      out.push(tok);
+      afterStar=true;
+      prevAtomic=false;
+      continue;
+    }
+    if (['+','-','/','(',')'].includes(tok)){
+      out.push(tok);
+      afterStar=false;
+      prevAtomic=false;
+      continue;
+    }
+    if (!afterStar){
+      out.push(tok);
+      continue;
+    }
+    // внутри хвоста после "*": разделители/союзы
+    if (low==='и' || low==='на'){
+      out.push('*');
+      prevAtomic=false;
+      continue;
+    }
+    if (tok===',' || tok===';'){
+      prevAtomic=false;
+      continue;
+    }
+    const atomic = isDigitTok(tok) || isUnitTok(tok);
+    const tensHundScale = isTensOrHundOrScale(tok);
+    if (prevAtomic && atomic){
+      out.push('*');
+    }
+    out.push(tok);
+    // после десятков/сотен/масштабов НЕ считаем «атомарным», чтобы "двадцать три" не стало "двадцать * три"
+    prevAtomic = atomic && !tensHundScale;
+  }
+  return out.join(' ');
 }
 
 function parseExpression(textRaw){
-  const text = textRaw.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
-
-  // Если распозналось как перечисление масштабов через запятую/точку → вероятно, сложение
+  let text = textRaw.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
+  // Возможное перечисление масштабов через запятую/точку → складываем
   let t = text
-    .replace(/((?:\d+|[а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*))\s*[\.,]\s+(?=\S)/gi, function(_, g1){ return g1 + ' плюс '; })
-    .replace(/(\S)\s*[\.,]\s+((?:\d+|[а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*))/gi, function(_, g1, g2){ return g1 + ' плюс ' + g2; })
+    .replace(/((?:\d+|[ а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*))\s*[\.,]\s+(?=\S)/gi, '$1 плюс ')
+    .replace(/(\S)\s*[\.,]\s+((?:\d+|[ а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*))/gi, '$1 плюс $2')
     .replace(/руб(ль|ля|лей)/g,' ').replace(/коп(ейка|ейки|еек)/g,' ')
     .replace(/[−–—-]/g,'-')
     .replace(/(посчитай|посчитать|сколько будет|сколько|сосчитай|итого|в итоге|равно)/g,' ')
     .trim();
 
-  // защитим «1/2» на этапе токенизации
+  // защитим «1/2»
   t = t.replace(/\b1\s*\/\s*2\b/g,' §half§ ').replace(/½/g,' §half§ ');
 
+  // Базовая нормализация и явные операции
   t = normalizeNumeralTypos(t)
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
-    .replace(/(^|[^a-zа-яё])(умнож[а-я]*)(?=($|[^a-zа-яё]))/gi,'$1 * ')
-    .replace(/(^|[^a-zа-яё])(помнож[а-я]*)(?=($|[^a-zа-яё]))/gi,'$1 * ')
     .replace(/(раздели|разделить|подели|дели)\s+на/g,' / ')
     .replace(/(^|[^a-zа-яё0-9])плюс(?=($|[^a-zа-яё0-9]))/gi,'$1 + ')
     .replace(/(^|[^a-zа-яё0-9])минус(?=($|[^a-zа-яё0-9]))/gi,'$1 - ')
-    // безопасная подмена знака умножения — только между цифрами
-    .replace(/(\d)\s*[×xх]\s*(\d)/g, function(_, a, b){ return a + ' * ' + b; })
+    .replace(/(\d)\s*[×xх]\s*(\d)/g,'$1 * $2') // "2 х 3"
     .replace(/[÷:]/g,'/')
     .replace(/\s+/g,' ')
     .trim();
 
+  // 1) «X на Y» даже без «умножь»
   t = fixNaMultiplication(t);
-  t = insertStarsBetweenBareNumbers(t);
+  // 2) Хвост после "*": "* 5 3" → "* 5 * 3" и "* пять три" → "* пять * три"
+  t = insertStarsAfterStar(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
   const out=[], disp=[];
@@ -535,21 +574,35 @@ function parseExpression(textRaw){
     let s=part.trim();
 
     if(['+','-','*','/'].includes(s)){
-      if (s==='-' && (out.length===0 || ['+','-','*','/','('].includes(out[out.length-1]))) { pendingUnaryMinus=true; continue; }
-      out.push(s); disp.push(' ' + s + ' '); continue;
+      if (s==='-' && (out.length===0 || ['+','-','*','/','('].includes(out[out.length-1]))) {
+        pendingUnaryMinus=true;
+        continue;
+      }
+      out.push(s);
+      disp.push(' ' + s + ' ');
+      continue;
     }
-
 
     s = s.replace(/§half§/g,'1/2');
     const m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/);
-    if(m){ const n=extractNumberRu(m[1]); out.push('(' + n + '/100)'); disp.push((m[1].trim()+'%')); pendingUnaryMinus=false; continue; }
-
+    if(m){
+      const n = extractNumberRu(m[1]);
+      out.push('(' + n + '/100)');
+      disp.push(m[1].trim()+'%');
+      pendingUnaryMinus=false;
+      continue;
+    }
     let n = extractNumberRu(s);
-    if (pendingUnaryMinus){ if (!n.startsWith('-')) n='-'+n; pendingUnaryMinus=false; }
-    out.push(n); disp.push(formatNumberSpaces(n));
+    if (pendingUnaryMinus){
+      if (!n.startsWith('-')) n='-'+n;
+      pendingUnaryMinus=false;
+    }
+    out.push(n);
+    disp.push(formatNumberSpaces(n));
   }
 
-  const sanitized = out.join(''); const display = disp.join('').trim();
+  const sanitized = out.join('');
+  const display = disp.join('').trim();
   if(!/^[0-9+\-*/.() ]+$/.test(sanitized)) throw new Error('Недопустимые символы');
   return {display, sanitized};
 }
