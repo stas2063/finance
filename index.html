@@ -470,31 +470,48 @@
     }
 
     /* ===== Разбор выражения ===== */
-// Исправление: после «умножь на» распознавание часто даёт перечисление чисел
-// («пять и три»). Раньше это сворачивалось в сумму (=8), теперь — в цепочку
-// множителей: «* пять и три» → «* пять * три». Также «X на Y» → «X * Y» даже
-// без слова «умножь» (для цифр и слов-чисел).
+// «X на Y» → «X * Y» и разворачивание перечислений после «*»
+function fixNaMultiplication(str){
+  // «12 на 3» → «12 * 3»
+  str = str.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/gi, '$1 * $2');
+  // «пять на три» → «пять * три» (сотни/тысячи/миллионы тоже)
+  const w = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
+  return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b', 'gi'), '$1 * $2');
+}
 
-function splitListForMultiply(s){
-  // Не трогаем дробные формулировки «три целых и пять десятых»
-  const fracGuard = /(\bцел(ых|ая|ое)\b|\bдесят(ых|ая|ую)\b|\bсот(ых|ая|ую)\b|\bтысячн(ых|ая|ую)\b|\bдесятитысячн(ых|ая|ую)\b|\bстотысячн(ых|ая|ую)\b|\bмиллионн(ых|ая|ую)\b|\bмиллиардн(ых|ая|ую)\b)/i;
-  if (fracGuard.test(s)) return null;
-  const chunks = s.split(/\s*(?:и\s+|[,;]\s*)/i).filter(Boolean);
-  if (chunks.length < 2){
-    const tokens = s.trim().split(/\s+/);
-    if (tokens.length < 2) return null;
-    const simple=/^(?:\d|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)$/;
-    if(!tokens.every(t=>simple.test(t))) return null;
-    return tokens.map(t=>extractNumberRu(t));
-  }
-  const nums = [];
-  for (const ch of chunks){
-    const v = extractNumberRu(ch);
-    const f = parseFloat(v);
-    if (!isFinite(f)) return null;
-    nums.push(v);
-  }
-  return nums;
+function expandMultiplicativeList(str){
+  // "* пять и три" / "* 5, 3" / "* пять, три" → "* пять * три"
+  return str.replace(/(\*)(\s*)([^+\-*/]+)/g, (m, star, sp, tail) => {
+    let parts = tail
+      .replace(/[,;]+/g, ' и ')
+      .split(/\s+и\s+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (parts.length <= 1){
+      const tokens = tail.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length <= 1) return m;
+      const isNumWord = t => {
+        t = t.toLowerCase();
+        return /^\d+(?:[.,]\d+)?$/.test(t) ||
+               UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
+               /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
+      };
+      if (!tokens.every(isNumWord)) return m;
+      parts = tokens;
+    }
+
+    const isNumWord = t => {
+      t = t.toLowerCase();
+      return /^\d+(?:[.,]\d+)?$/.test(t) ||
+             UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
+             /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t);
+    };
+    const ok = parts.every(p => p.split(/\s+/).every(isNumWord));
+    if (!ok) return m;
+
+    return star + ' ' + parts.join(' * ');
+  });
 }
 
 function parseExpression(textRaw){
@@ -526,10 +543,8 @@ function parseExpression(textRaw){
     .replace(/\s+/g,' ')
     .trim();
 
-  // «X на Y» → «X * Y» для цифр
-  t = t.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/g, function(_, a, b){ return a + ' * ' + b; });
-  // «X на Y» → «X * Y» для слов-чисел (базовый словарь)
-  t = t.replace(/\b(ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот)\b\s+на\s+\b(ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот)\b/gi, function(_, a, b){ return a + ' * ' + b; });
+  t = fixNaMultiplication(t);
+  t = expandMultiplicativeList(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
   const out=[], disp=[];
@@ -543,20 +558,6 @@ function parseExpression(textRaw){
       out.push(s); disp.push(' ' + s + ' '); continue;
     }
 
-    // Если предыдущий токен — умножение, а сейчас перечисление чисел,
-    // разворачиваем в цепочку множителей
-    if (out[out.length-1] === '*'){
-      const list = splitListForMultiply(s);
-      if (list){
-        for(let i=0;i<list.length;i++){
-          let n = String(list[i]);
-          if (pendingUnaryMinus){ if (!n.startsWith('-')) n='-'+n; pendingUnaryMinus=false; }
-          out.push(n); disp.push(formatNumberSpaces(n));
-          if (i < list.length-1){ out.push('*'); disp.push(' * '); }
-        }
-        continue;
-      }
-    }
 
     s = s.replace(/§half§/g,'1/2');
     const m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/);
