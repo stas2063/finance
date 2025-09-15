@@ -616,9 +616,40 @@ function insertStarAfterPercent(str){
   return str.replace(reg,'$1 * ');
 }
 
-// Удаляем фразы вида "одна треть", "две пятых" — калькулятор их не поддерживает
-function dropFractionPhrases(str){
-  return str.replace(/(?:^|\s)(?:\d+(?:[.,]\d+)?|[а-яё]+)\s+(?:треть(?:их)?|втор(?:ых|их)|четверт(?:ых|их)|пят(?:ых|их)|шест(?:ых|их)|седьм(?:ых|их)|восьм(?:ых|их)|девят(?:ых|их)|десят(?:ых|их))(?=\s|$)/gi,'');
+// "две трети" → "2/3", "три четверти" → "3/4"
+function normalizeFractions(str){
+  const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
+  const DEN = '('
+    + 'половин[а-я]*|'
+    + 'втор(?:ая|ой|ую|ых|их)|'
+    + 'трет(?:ья|ью|ей|и|их)|'
+    + 'четверт(?:ь|и|ую|ых|ой)|'
+    + 'пят(?:ая|ую|ых|и)|'
+    + 'шест(?:ая|ую|ых|и)|'
+    + 'седьм(?:ая|ую|ых|и)|'
+    + 'восьм(?:ая|ую|ых|и)|'
+    + 'девят(?:ая|ую|ых|и)|'
+    + 'десят(?:ая|ую|ых|и)'
+    + ')';
+  const re = new RegExp(`(^|\\s)(${NUM})\\s+${DEN}(?=\\s|$)`, 'gi');
+  return str.replace(re, (m, lead, numStr, denStr) => {
+    const num = extractNumberRu(numStr);
+    const d = denStr.toLowerCase();
+    let den = 0;
+    if(/^пол|^втор/.test(d)) den = 2;
+    else if(/^трет/.test(d)) den = 3;
+    else if(/^четверт/.test(d)) den = 4;
+    else if(/^пят/.test(d)) den = 5;
+    else if(/^шест/.test(d)) den = 6;
+    else if(/^седьм/.test(d)) den = 7;
+    else if(/^восьм/.test(d)) den = 8;
+    else if(/^девят/.test(d)) den = 9;
+    else if(/^десят/.test(d)) den = 10;
+    if(!isNaN(Number(num)) && den){
+      return `${lead}${num} / ${den}`;
+    }
+    return m;
+  });
 }
 
 // Удаляем токены, не относящиеся к числам или операциям
@@ -674,8 +705,8 @@ function parseExpression(textRaw){
   t = fixNaDivision(t);
   // 2) "10% 5" → "10% * 5"
   t = insertStarAfterPercent(t);
-  // 2b) убираем текстовые дроби "одна треть" и т.п.
-  t = dropFractionPhrases(t);
+  // 2b) "две трети" → "2/3"
+  t = normalizeFractions(t);
   // 3) Хвост после "*": множители через пробел/"и"/запятую
   t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
