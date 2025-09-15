@@ -909,7 +909,15 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           const results = Array.from(e.results||[]);
           const segBest = results.map(seg => {
             const arr = Array.from(seg);
-            arr.sort((a,b)=>{ const sa=String(a.transcript||''); const sb=String(b.transcript||''); const amag = /тыс|млн|млрд|миллион|миллиард/i.test(sa)?1:0; const bmag = /тыс|млн|млрд|миллион|миллиард/i.test(sb)?1:0; if(b.confidence!==a.confidence) return b.confidence-a.confidence; if(bmag!==amag) return bmag-amag; return sb.length-sa.length; });
+            const score = cand => {
+              const s = String(cand.transcript||'');
+              let val = cand.confidence;
+              const frac = /(половин(?:а|ой|у|ы)?|втор(?:ых|ая|ой|ую)|трет(?:их|ья|ей|ью)|четверт(?:ых|ая|ой|ую)|пят(?:ых|ая|ой|ую)|шест(?:ых|ая|ой|ую)|седьм(?:ых|ая|ой|ую)|восьм(?:ых|ая|ой|ую)|девят(?:ых|ая|ой|ую)|десят(?:ых|ая|ой|ую))(?:\s|$)/i;
+              if (frac.test(s)) val += 1;
+              if (/тыс|млн|млрд|миллион|миллиард/i.test(s)) val += 0.5;
+              return val + s.length/1000;
+            };
+            arr.sort((a,b)=> score(b)-score(a));
             return arr[0]?.transcript || '';
           });
           const joined = mergeSegmentsNoDup(segBest);
