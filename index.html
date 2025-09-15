@@ -11,7 +11,7 @@
   <style>
     :root{ --bg:#f0f2f5; --fg:#111; --muted:#666; --primary:#0a84ff; --card:#fff; --divider: rgba(0,0,0,.08); --input-bg:#fff;
       --safe-top: env(safe-area-inset-top); --safe-left: env(safe-area-inset-left); --safe-right: env(safe-area-inset-right); --safe-bottom: env(safe-area-inset-bottom); }
-    [data-theme="dark"]{ --bg:#0c0d0f; --fg:#f5f5f7; --muted:#a0a0a0; --primary:#0a84ff; --card:#14161a; --divider: rgba(255,255,255,.08); --input-bg:#1b1f24; }
+    [data-theme="dark"]{ --bg:#121212; --fg:#f5f5f7; --muted:#a0a0a0; --primary:#0a84ff; --card:#1e1e1e; --divider: rgba(255,255,255,0.1); --input-bg:#1b1f24; }
     *{ box-sizing:border-box; }
     html,body{ height:100vh; min-height:100vh; overflow:hidden; overscroll-behavior:none; }
     @supports (height: 100dvh){ html,body{ height:100dvh; min-height:100dvh; } }
@@ -45,15 +45,17 @@
     .btn.circle{ width:160px; height:160px; border-radius:9999px; }
     .btn .title{ font-weight:800; font-size:16px; letter-spacing:.4px; }
 
-    h2.his{ margin: 12px auto 8px; font-size: 20px; font-weight: 800; text-align: center; }
-
-    .history-card{ position:relative; width:min(560px, 92%); margin:8px auto calc(32px + var(--safe-bottom)); border:1px solid var(--divider); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; height:clamp(260px, 44vh, 460px); background:var(--card); }
-    ul.history{ list-style:none; padding:8px 8px 96px 8px; margin:0; width:100%; flex:1; overflow:auto; }
-    ul.history li{ padding:10px 12px; border-bottom:1px solid var(--divider); font-size:14px; }
-    ul.history li:last-child{ border-bottom:0; }
-    .history-footer{ position:absolute; left:0; right:0; bottom:0; border-top:1px solid var(--divider); padding:8px; display:flex; justify-content:flex-end; background:var(--card); z-index:3; box-shadow:0 -6px 14px rgba(0,0,0,.18); transform:translateZ(0); }
-    .btn.secondary{ background:transparent; color:var(--fg); border:1px solid var(--divider); box-shadow:none; border-radius:16px; padding:10px 14px; width:auto; height:auto; }
-    .history-card::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:80px; pointer-events:none; z-index:2; background:linear-gradient(to top, var(--card) 70px, rgba(0,0,0,0) 100%); }
+    .history-block{ background:var(--card); border-radius:16px; padding:16px; width:min(560px,92%); margin:8px auto calc(32px + var(--safe-bottom)); display:flex; flex-direction:column; gap:16px; max-height:clamp(260px,44vh,460px); }
+    .history-title{ margin:0; font-size:18px; font-weight:600; text-align:center; color:var(--fg); }
+    .history-list{ list-style:none; margin:0; padding:0; flex:1; overflow:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+    .history-list::-webkit-scrollbar{ display:none; }
+    .history-list li{ padding:12px 0; border-bottom:1px solid var(--divider); }
+    .history-list li:last-child{ border-bottom:0; }
+    .history-list .expr{ font-size:16px; color:var(--fg); }
+    .history-list .time{ font-size:14px; color:var(--muted); margin-top:2px; }
+    .history-list li.empty{ color:var(--muted); font-size:14px; text-align:center; }
+    .history-clear{ width:100%; background:#0a84ff; color:#fff; border:0; border-radius:10px; padding:12px 0; font-size:16px; font-weight:600; cursor:pointer; }
+    .history-clear:active{ transform:scale(.98); }
 
     .hamb{ position:fixed; top:calc(var(--safe-top) + 36px); left:calc(var(--safe-left) + 14px); width:48px; height:48px; border:0; border-radius:14px; background:var(--primary); color:#fff; font-size:24px; font-weight:800; display:grid; place-items:center; box-shadow:0 6px 16px rgba(10,132,255,.35); cursor:pointer; z-index:1100; }
 
@@ -107,12 +109,10 @@
           <button id="btnListen" class="btn circle"><span class="title" id="btnTitle">НАЖМИ</span></button>
         </div>
         <div style="height:12px"></div>
-        <h2 class="his">История вычислений</h2>
-        <div class="history-card">
-          <ul id="historyList" class="history"></ul>
-          <div class="history-footer">
-            <button id="btnClearHistory" class="btn secondary"><span class="title">Очистить</span></button>
-          </div>
+        <div class="history-block">
+          <h2 class="history-title">История вычислений</h2>
+          <ul id="historyList" class="history-list"></ul>
+          <button id="btnClearHistory" class="history-clear">Очистить</button>
         </div>
       </section>
 
@@ -198,12 +198,16 @@
     const toggleDrawer=()=> isOpen?closeDrawer():openDrawer();
     btnMenu.addEventListener('click',e=>{ e.preventDefault(); toggleDrawer(); });
     scrim.addEventListener('click', closeDrawer);
+    function swallowClick(){
+      const h=e=>{ e.stopPropagation(); e.preventDefault(); window.removeEventListener('click',h,true); };
+      window.addEventListener('click',h,true);
+    }
     function beginOpen(x){ measure(); dragging=true; modeDrag='open';  startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(-w); }
     function beginClose(x){ measure(); dragging=true; modeDrag='close'; startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(0); }
     function moveTo(x){ const dx=x-startX; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
     function endDrag(e){
       if(!dragging) return;
-      e.preventDefault();
+      swallowClick();
       e.currentTarget.releasePointerCapture?.(e.pointerId);
       dragging=false;
       const opened=1+pos/w;
@@ -242,8 +246,8 @@
     function renderHistory(){
       const a=loadHistory();
       historyList.innerHTML = a.length
-        ? a.map(i=>`<li><b>${i.expr}</b> = ${i.res}<br><span style="color:var(--muted);font-size:12px">${formatTime(i.t)}</span></li>`).join('')
-        : '<li style="color:var(--muted);padding:10px 12px">Пока пусто</li>';
+        ? a.map(i=>`<li><div class="expr">${i.expr} = ${i.res}</div><div class="time">${formatTime(i.t)}</div></li>`).join('')
+        : '<li class="empty">Пока пусто</li>';
     }
     $('#btnClearHistory').addEventListener('click',()=>{ saveHistory([]); renderHistory(); });
 
@@ -260,6 +264,29 @@
         .replace(/\bтыс\.?\b/g,'тысяч')
         .replace(/\bмлн\.?\b/g,'миллион')
         .replace(/\bмлрд\.?\b/g,'миллиард')
+        // порядковые -> количественные
+        .replace(/\bперв(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'один')
+        .replace(/\bвтор(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'два')
+        .replace(/\bтрет(?:ий|ья|ье|ью|ьей|ьим|ьих|ей)\b/g,'три')
+        .replace(/\bтреть(?:я|ей|ю|е)?\b/g,'три')
+        .replace(/\bчетверт(?:ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'четыре')
+        .replace(/\bпят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'пять')
+        .replace(/\bшест(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'шесть')
+        .replace(/\bседьм(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'семь')
+        .replace(/\bвосьм(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'восемь')
+        .replace(/\bдевят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'девять')
+        .replace(/\bдесят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'десять')
+        // родительные падежи после "из" или при указании долей
+        .replace(/(^|\s)одн(?:ой|ого|ому|ым|ых)(?=\s|$)/g,'$1один')
+        .replace(/(^|\s)двух(?=\s|$)/g,'$1два')
+        .replace(/(^|\s)тр(?:ех|ёх)(?=\s|$)/g,'$1три')
+        .replace(/(^|\s)четыр(?:ех|ёх)(?=\s|$)/g,'$1четыре')
+        .replace(/(^|\s)пяти(?=\s|$)/g,'$1пять')
+        .replace(/(^|\s)шести(?=\s|$)/g,'$1шесть')
+        .replace(/(^|\s)семи(?=\s|$)/g,'$1семь')
+        .replace(/(^|\s)восьми(?=\s|$)/g,'$1восемь')
+        .replace(/(^|\s)девяти(?=\s|$)/g,'$1девять')
+        .replace(/(^|\s)десяти(?=\s|$)/g,'$1десять')
         // «миллион/миллиард», но НЕ «миллионных/миллиардных»
         .replace(/\bмиль?и?он(?!н[а-я])([а-я]*)\b/g,'миллион$1')
         .replace(/\bмили?ард(?!н[а-я])([а-я]*)\b/g,'миллиард$1')
@@ -488,6 +515,16 @@ function fixNaMultiplication(str){
   return str.replace(re, (m, lead,a,b)=> lead+a+' * '+b);
 }
 
+// "X дели Y" → "X / Y" (когда распознавание пропустило слово «на»)
+function fixNaDivision(str){
+  // цифры: "12 дели 3" → "12 / 3"
+  str = str.replace(/(\d+(?:[.,]\d+)?)\s+(?:дели|раздели|подели|поделить)\s+(\d+(?:[.,]\d+)?)/gi,'$1 / $2');
+  // слова и масштабы: "шесть дели три" → "шесть / три"
+  const w='(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|тыс\.?|миллион[а-я]*|млн\.?|миллиард[а-я]*|млрд\.?)';
+  const re=new RegExp('(^|\\s)('+w+')\s+(?:дели|раздели|подели|поделить)\s+('+w+')(?=\\s|$)','gi');
+  return str.replace(re,(m,lead,a,b)=>lead+a+' / '+b);
+}
+
 // После "*" если идут «голые» числа или списки через запятую/«и/на», вставляем "*" между ними.
 // "* 5 3" → "* 5 * 3", "* пять, три" → "* пять * три".
 // Не ломает составные "двадцать три": десятки/сотни/масштабы не считаются «атомарными».
@@ -546,7 +583,7 @@ function insertStarsAfterStar(str){
     out.push(tok);
     prevAtomic = atomic && !tensHundScale;
     if (hadSep){
-      out.push('*');
+      if (toks[i+1] !== '*') out.push('*');
       prevAtomic=false;
     }
   }
@@ -565,27 +602,159 @@ function insertStarsBetweenBareNumbers(str){
   return str;
 }
 
+// Схлопываем повторяющиеся "*" (во избежание "* *" → "**" → возведение в степень)
+function collapseRepeatedStars(str){
+  return str.replace(/\*(?:\s*\*)+/g,'*');
+}
+
+// Если оператор пропал, а осталось только "1380 4" → добавим "+" → "1380 + 4"
+function insertPlusBetweenNumbers(str){
+  return str.replace(/(\d+(?:\s\d{3})*)\s(\d{1,2})(?=($|[^0-9]))/g,(m,a,b)=>{
+    const first = parseInt(a.replace(/\s/g,''),10);
+    return first>=100 ? `${a} + ${b}` : m;
+  });
+}
+
+// "* пять и три" / "* 5, 3" / "* пять, три" → "* пять * три"
+function expandMultiplicativeList(str){
+  return str.replace(/(\*)(\s*)([^+\-*/]+)/g, (m, star, sp, tail)=>{
+    const parts = tail
+      .replace(/[,;]+/g, ' и ')
+      .split(/\s+и\s+/)
+      .map(s=>s.trim())
+      .filter(Boolean);
+    if(parts.length<=1) return m;
+    const isNumWord = t=>{
+      t=t.toLowerCase();
+      return /^\d+(?:[.,]\d+)?$/.test(t) ||
+             UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
+             /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t) ||
+             t==='млн' || t==='млрд';
+    };
+    const ok = parts.every(p=>p.split(/\s+/).every(isNumWord));
+    if(!ok) return m;
+    return star + ' ' + parts.join(' * ');
+  });
+}
+
 // После "%" или слова "процент" если сразу идёт число/числительное,
 // вставляем "*", чтобы не получилось сложение "10% 5" → "10% * 5".
 function insertStarAfterPercent(str){
+  str = str.replace(/(процент(?:а|ов)?|%)\s+на\s+/gi, '$1 * ');
   const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
   const reg = new RegExp('(процент(?:а|ов)?|%)\\s+(?=(?:\\d+(?:[.,]\\d+)?|'+unit+')(?:\\s|$))','gi');
   return str.replace(reg,'$1 * ');
 }
 
+// Если перед sqrt/cbrt/root идёт число или словесное числительное без знака,
+// вставляем "*" для корректного умножения: "5 корень из 5" → "5 * sqrt(5)".
+function insertStarBeforeRoots(str){
+  const num = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
+  const re = new RegExp('(^|[+\\-*/(])\\s*(' + num + ')\\s+(?=(?:sqrt|cbrt|root)\\()', 'gi');
+  return str.replace(re, (m, lead, n) => lead + n + ' * ');
+}
+
+// "два в квадрате", "пять в степени четыре", "квадратный корень из 81", "кубический корень из 8",
+// "корень третьей степени из 27" → соответствующие pow()/sqrt()/cbrt()/root()
+function normalizePowersAndRoots(str){
+  let s = String(str);
+  const ord = w=>{
+    w=w.toLowerCase().trim();
+    const map={
+      'перв':1,'втор':2,'треть':3,'трет':3,'четвер':4,'четвёр':4,
+      'пят':5,'шест':6,'седь':7,'восьм':8,'девят':9,'десят':10
+    };
+    for(const k in map){ if(w.startsWith(k)) return String(map[k]); }
+    return w;
+  };
+  // степени
+  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+квадрате/gi, (_,a)=>`pow(${a},2)`);
+  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+кубе/gi, (_,a)=>`pow(${a},3)`);
+  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+степени\s+([\d.,а-яё]+)/gi, (_,a,b)=>`pow(${a},${ord(b)})`);
+  // корни
+  s = s.replace(/квадратн[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  s = s.replace(/корень\s+квадратн[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  s = s.replace(/кубическ[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
+  s = s.replace(/корень\s+кубическ[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
+  s = s.replace(/корень\s+([\d.,а-яё]+)\s+степени\s+из\s+([\d.,а-яё]+)/gi, (_,deg,x)=>`root(${x},${ord(deg)})`);
+  s = s.replace(/корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  return s;
+}
+
+// "две трети" → "2/3", "семь пятых" → "7/5"
+function normalizeFractions(str){
+  const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
+  const DEN = '('
+    + 'половин[а-я]*|'
+    + 'втор(?:ая|ой|ую|ых|их)|'
+    + 'трет(?:ья|ью|ей|и|их)|'
+    + 'четверт(?:ь|и|ую|ых|ой)|'
+    + 'пят(?:ая|ую|ых|и)|'
+    + 'шест(?:ая|ую|ых|и)|'
+    + 'седьм(?:ая|ую|ых|и)|'
+    + 'восьм(?:ая|ую|ых|и)|'
+    + 'девят(?:ая|ую|ых|и)|'
+    + 'десят(?:ая|ую|ых|и)'
+    + ')';
+
+  // 1) Строгое совпадение с формами "пятых", "четвертых" и т.п.
+  const reWords = new RegExp(`(^|\\s)(${NUM})\\s+${DEN}(?=\\s|$|[.,!?;:])`, 'gi');
+  str = str.replace(reWords, (m, lead, numStr, denStr) => {
+    const num = extractNumberRu(numStr);
+    const d = denStr.toLowerCase();
+    let den = 0;
+    if(/^пол|^втор/.test(d)) den = 2;
+    else if(/^трет/.test(d)) den = 3;
+    else if(/^четверт/.test(d)) den = 4;
+    else if(/^пят/.test(d)) den = 5;
+    else if(/^шест/.test(d)) den = 6;
+    else if(/^седьм/.test(d)) den = 7;
+    else if(/^восьм/.test(d)) den = 8;
+    else if(/^девят/.test(d)) den = 9;
+    else if(/^десят/.test(d)) den = 10;
+    if(!isNaN(Number(num)) && den){
+      return `${lead}${num} / ${den}`;
+    }
+    return m;
+  });
+
+  // 2) Иногда ASR теряет окончание и отдаёт просто "семь пять" → трактуем как 7/5,
+  //    если обе части — числа <=10 и числитель не слишком большой.
+  const CARD = '(?:\\d+|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)';
+  const reCard = new RegExp(`(^|\\s)(${NUM})\\s+(${CARD})(?=\\s|$|[.,!?;:])`, 'gi');
+  str = str.replace(reCard, (m, lead, numStr, denStr, offset, s) => {
+    const prev = s[offset-1];
+    if(prev==='*' || prev==='/') return m;
+    const num = Number(extractNumberRu(numStr));
+    const den = Number(extractNumberRu(denStr));
+    if(!isNaN(num) && !isNaN(den) && num < 100 && den >= 2 && den <= 10){
+      return `${lead}${num} / ${den}`;
+    }
+    return m;
+  });
+
+  return str;
+}
+
 // Удаляем токены, не относящиеся к числам или операциям
 function stripIrrelevantTokens(str){
-  return str.split(/\s+/).filter(tok=>{
-    if(!tok) return false;
-    if(['+','-','*','/','(',')'].includes(tok)) return true;
-    if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
-    if(/^процент(?:а|ов)?$/i.test(tok)) return true;
-    const low = tok.toLowerCase();
-    return /^\d+(?:[.,]\d+)?$/.test(tok) ||
-           UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
-           /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
-           low==='млн' || low==='млрд';
-  }).join(' ');
+  return str
+    .split(/\s+/)
+    .map(tok => tok.replace(/^[.,!?;:]+|[.,!?;:]+$/g,''))
+    .map(tok => tok.replace(/[×xх]/g,'*').replace(/[÷:]/g,'/'))
+    .filter(tok=>{
+      if(!tok) return false;
+      if(['+','-','*','/','(',')'].includes(tok)) return true;
+      if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
+      if(/^процент(?:а|ов)?$/i.test(tok)) return true;
+      if(/^(?:pow|sqrt|cbrt|root)\(/i.test(tok)) return true;
+      const low = tok.toLowerCase();
+      return /^\d+(?:[.,]\d+)?$/.test(tok) ||
+             UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
+             /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
+             low==='млн' || low==='млрд';
+    })
+    .join(' ');
 }
 
 function parseExpression(textRaw){
@@ -603,11 +772,15 @@ function parseExpression(textRaw){
   t = t.replace(/\b1\s*\/\s*2\b/g,' §half§ ').replace(/½/g,' §half§ ');
 
   // Базовая нормализация и явные операции
-  t = normalizeNumeralTypos(t)
+  t = normalizeNumeralTypos(t);
+  t = normalizePowersAndRoots(t);
+  t = insertStarBeforeRoots(t);
+  t = t
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
     .replace(/(^|[^a-zа-яё0-9])(умнож[а-я]*|помнож[а-я]*)(?=($|[^a-zа-яё0-9]))/g,'$1 * ')
-    .replace(/(раздели|разделить|подели|дели)\s+на/g,' / ')
+    .replace(/(раздели|разделить|подели|поделить|дели)\s+на/g,' / ')
+    .replace(/(^|[^a-zа-яё0-9])(раздели|разделить|подели|поделить|дели)(?=($|[^a-zа-яё0-9]))/g,'$1 / ')
     .replace(/(^|[^a-zа-яё0-9])плюс(?=($|[^a-zа-яё0-9]))/gi,'$1 + ')
     .replace(/(^|[^a-zа-яё0-9])минус(?=($|[^a-zа-яё0-9]))/gi,'$1 - ')
     .replace(/(\d)\s*[×xх]\s*(\d)/g,'$1 * $2') // "2 х 3"
@@ -617,13 +790,22 @@ function parseExpression(textRaw){
 
   // 1) «X на Y» даже без «умножь»
   t = fixNaMultiplication(t);
+  t = fixNaDivision(t);
   // 2) "10% 5" → "10% * 5"
   t = insertStarAfterPercent(t);
+  // 2b) "две трети" → "2/3"
+  t = normalizeFractions(t);
   // 3) Хвост после "*": множители через пробел/"и"/запятую
+  t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
   t = insertStarsBetweenBareNumbers(t);
+  t = collapseRepeatedStars(t);
   // 4) удаляем посторонние слова
   t = stripIrrelevantTokens(t);
+  // 5) между цифрами может потеряться «плюс»: "1380 4" → "1380 + 4"
+  t = insertPlusBetweenNumbers(t);
+  // 6) схлопываем дублирующиеся операторы ("- -" → "-")
+  t = t.replace(/([+\-*/])\s*\1+/g,'$1');
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
   const out=[], disp=[];
@@ -638,13 +820,49 @@ function parseExpression(textRaw){
         continue;
       }
       out.push(s);
-      disp.push(' ' + s + ' ');
+      const opDisplay = s==='*' ? '×' : s==='/' ? '÷' : s;
+      disp.push(' ' + opDisplay + ' ');
       continue;
     }
 
     s = s.replace(/§half§/g,'1/2');
-    const m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/);
-    if(m){
+
+    let m;
+    if(m = s.match(/^sqrt\((.+)\)$/)){
+      const arg = extractNumberRu(m[1]);
+      out.push(`(${arg})**0.5`);
+      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
+      disp.push(prettyMathForDisplay(`sqrt(${arg})`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+    if(m = s.match(/^cbrt\((.+)\)$/)){
+      const arg = extractNumberRu(m[1]);
+      out.push(`(${arg})**(1/3)`);
+      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
+      disp.push(prettyMathForDisplay(`cbrt(${arg})`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+    if(m = s.match(/^root\((.+),(.+)\)$/)){
+      const base = extractNumberRu(m[1]);
+      const deg = extractNumberRu(m[2]);
+      out.push(`(${base})**(1/${deg})`);
+      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
+      disp.push(prettyMathForDisplay(`root(${base},${deg})`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+    if(m = s.match(/^pow\((.+),(.*)\)$/)){
+      const base = extractNumberRu(m[1]);
+      const deg = extractNumberRu(m[2]);
+      out.push(`(${base})**(${deg})`);
+      disp.push(prettyMathForDisplay(`${base}^${deg}`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+
+    if(m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/)){
       const n = extractNumberRu(m[1]);
       out.push('(' + n + '/100)');
       disp.push(formatNumberSpaces(n)+'%');
@@ -665,6 +883,74 @@ function parseExpression(textRaw){
   if(!sanitized) throw new Error('Пустое выражение');
   if(!/^[0-9+\-*/.() ]+$/.test(sanitized)) throw new Error('Недопустимые символы');
   return {display, sanitized};
+}
+
+// === КРАСИВОЕ ОТОБРАЖЕНИЕ: root/sqrt/cbrt -> знак корня, ^n -> надстрочные ===
+// перевод цифр в надстрочные символы для индекса и степеней
+function toSuperscript(str){
+  const map={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻','+':'⁺'};
+  return String(str).split('').map(ch=>map[ch]??ch).join('');
+}
+
+// парсит вызов функции вида name( ... ) с учётом вложенных скобок
+// возвращает { start, end, args[] }
+function parseCall(src,i,name){
+  const head=name+'(';
+  if(!src.startsWith(head,i)) return null;
+  let j=i+head.length,depth=1,args=[],buf='';
+  while(j<src.length && depth>0){
+    const ch=src[j];
+    if(ch==='('){ depth++; buf+=ch; }
+    else if(ch===')'){
+      depth--;
+      if(depth===0){ args.push(buf.trim()); break; }
+      buf+=ch;
+    }else if(ch===',' && depth===1){
+      args.push(buf.trim()); buf='';
+    }else{
+      buf+=ch;
+    }
+    j++;
+  }
+  return {start:i,end:j,args};
+}
+
+// вспомогательная: заменить все вызовы функции на форматтер
+function replaceCalls(src,name,formatter){
+  let out='',i=0;
+  while(i<src.length){
+    if(src.startsWith(name+'(',i)){
+      const call=parseCall(src,i,name);
+      if(call && call.args.length>0){
+        out+=formatter(call.args);
+        i=call.end+1; // позиция после закрывающей ')'
+        continue;
+      }
+    }
+    out+=src[i++];
+  }
+  return out;
+}
+
+// делает красивую строку для ДИСПЛЕЯ (не для вычисления!)
+function prettyMathForDisplay(src){
+  let s=String(src);
+
+  const wrap = x => /^[\d.]+$/.test(x.trim()) ? x : `(${x})`;
+
+  // 1) sqrt(x) -> √x
+  s=replaceCalls(s,'sqrt',([x])=>`√${wrap(x)}`);
+
+  // 2) cbrt(x) -> ∛x
+  s=replaceCalls(s,'cbrt',([x])=>`∛${wrap(x)}`);
+
+  // 3) root(x,n) -> ⁿ√x
+  s=replaceCalls(s,'root',([x,n])=>`${toSuperscript(n||2)}√${wrap(x)}`);
+
+  // 4) ^целое -> надстрочный индекс (только для простых целых степеней)
+  s=s.replace(/\^([\-+]?\d+)/g,(_,pow)=>toSuperscript(pow));
+
+  return s;
 }
 
 const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+')+')')(); if(!isFinite(v)||isNaN(v)) throw 0; return parseFloat(Number(v).toFixed(4)).toString(); };
@@ -708,15 +994,27 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     let lastPreview = { display:'', out:'' };
     function updateLive(phrase){
       if(!phrase) return; // ничего не считаем
+      let parsed;
       try{
-        const {display,sanitized}=parseExpression(phrase);
-        const out=calc(sanitized); const outFmt=formatNumberSpaces(out);
-        lastPreview = { display, out: outFmt };
-        if(UI.expr){ UI.expr.textContent=display; UI.expr.scrollLeft=UI.expr.scrollWidth; }
-        fitFullText(outFmt);
+        parsed = parseExpression(phrase);
       }catch{
         lastPreview = { display:'', out:'' };
-        if(UI.expr){ UI.expr.textContent=phrase; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+        if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; }
+        fitFullText('');
+        return;
+      }
+
+      const {display,sanitized} = parsed;
+      const pretty = prettyMathForDisplay(display);
+      lastPreview = { display: pretty, out:'' };
+      if(UI.expr){ UI.expr.textContent=pretty; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+
+      try{
+        const out = calc(sanitized);
+        const outFmt = formatNumberSpaces(out);
+        lastPreview.out = outFmt;
+        fitFullText(outFmt);
+      }catch{
         fitFullText('');
       }
     }
@@ -781,7 +1079,15 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           const results = Array.from(e.results||[]);
           const segBest = results.map(seg => {
             const arr = Array.from(seg);
-            arr.sort((a,b)=>{ const sa=String(a.transcript||''); const sb=String(b.transcript||''); const amag = /тыс|млн|млрд|миллион|миллиард/i.test(sa)?1:0; const bmag = /тыс|млн|млрд|миллион|миллиард/i.test(sb)?1:0; if(b.confidence!==a.confidence) return b.confidence-a.confidence; if(bmag!==amag) return bmag-amag; return sb.length-sa.length; });
+            const score = cand => {
+              const s = String(cand.transcript||'');
+              let val = cand.confidence;
+              const frac = /(половин(?:а|ой|у|ы)?|втор(?:ых|ая|ой|ую)|трет(?:их|ья|ей|ью)|четверт(?:ых|ая|ой|ую)|пят(?:ых|ая|ой|ую)|шест(?:ых|ая|ой|ую)|седьм(?:ых|ая|ой|ую)|восьм(?:ых|ая|ой|ую)|девят(?:ых|ая|ой|ую)|десят(?:ых|ая|ой|ую))(?:\s|$)/i;
+              if (frac.test(s)) val += 1;
+              if (/тыс|млн|млрд|миллион|миллиард/i.test(s)) val += 0.5;
+              return val + s.length/1000;
+            };
+            arr.sort((a,b)=> score(b)-score(a));
             return arr[0]?.transcript || '';
           });
           const joined = mergeSegmentsNoDup(segBest);
@@ -841,5 +1147,3 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
   </script>
 </body>
 </html>
-
-
