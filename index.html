@@ -546,7 +546,7 @@ function insertStarsAfterStar(str){
     out.push(tok);
     prevAtomic = atomic && !tensHundScale;
     if (hadSep){
-      out.push('*');
+      if (toks[i+1] !== '*') out.push('*');
       prevAtomic=false;
     }
   }
@@ -563,6 +563,11 @@ function insertStarsBetweenBareNumbers(str){
   const reg = new RegExp('(\\*)\\s*((?:' + unit + '\\s+){1,}' + unit + ')','gi');
   str = str.replace(reg, (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
   return str;
+}
+
+// Схлопываем повторяющиеся "*" (во избежание "* *" → "**" → возведение в степень)
+function collapseRepeatedStars(str){
+  return str.replace(/\*(?:\s*\*)+/g,'*');
 }
 
 // "* пять и три" / "* 5, 3" / "* пять, три" → "* пять * три"
@@ -646,6 +651,7 @@ function parseExpression(textRaw){
   t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
   t = insertStarsBetweenBareNumbers(t);
+  t = collapseRepeatedStars(t);
   // 4) удаляем посторонние слова
   t = stripIrrelevantTokens(t);
 
