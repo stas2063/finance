@@ -31,6 +31,10 @@
     h1{ margin:12px 0 8px; font-size:28px; font-weight:800; }
     #status{ color:var(--muted); min-height:24px; margin:0 0 12px; display:flex; align-items:center; justify-content:center; text-align:center; }
 
+    /* Строка выражения — при переполнении уезжает влево, можно скроллить */
+    #expr{ font-size:32px; font-weight:600; min-height:36px; margin:4px 0; white-space:nowrap; overflow-x:auto; overflow-y:hidden; text-align:right; -webkit-overflow-scrolling:touch; }
+    #expr::-webkit-scrollbar{ display:none; }
+
     /* Большая строка результата — справа, плавно масштабируется, при переполнении «уезжает» влево */
     #full{ font-weight:800; font-size:64px; color:var(--primary); min-height:56px; margin:8px 0 18px; white-space:nowrap; overflow:hidden; line-height:1.1; text-align:right; will-change:font-size,transform; transition: font-size .18s ease, transform .18s ease; }
     #full[data-overflow="1"]{ -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,.12) 16px, #000 44px); mask-image: linear-gradient(to right, rgba(0,0,0,0) 0, rgba(0,0,0,.12) 16px, #000 44px); }
@@ -57,7 +61,7 @@
     .scrim{ position: fixed; inset: 0; background: rgba(0,0,0,.6); opacity: 0; pointer-events: none; transition: none; will-change: opacity; z-index: 1000; touch-action: none; }
     #edge{ position:fixed; inset:0 auto 0 0; width:24px; z-index:1002; touch-action:none; background:transparent; }
 
-    .navbtn{ appearance:none; display:block; width:100%; background:var(--primary); color:#fff; border:0; border-radius:22px; padding:18px 20px; margin:14px 0 0; text-align:left; font-weight:800; font-size:20px; box-shadow:0 10px 20px rgba(10,132,255,.25); cursor:pointer; }
+    .navbtn{ appearance:none; display:block; width:100%; background:var(--primary); color:#fff; border:0; border-radius:22px; padding:18px 20px; margin:14px 0 0; text-align:left; font-weight:800; font-size:20px; box-shadow:0 10px 20px rgba(10,132,255,.25); cursor:pointer; user-select:none; }
     .navbtn:active{ transform:translateY(1px); }
 
     .about-body{ flex:1; display:flex; flex-direction:column; gap:16px; padding:0 16px; }
@@ -69,9 +73,9 @@
 
     .field{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .label{ color:var(--muted); font-weight:600; }
-    .theme-toggle, .mode-toggle{ display:inline-flex; background:var(--input-bg); border:1px solid var(--divider); padding:4px; border-radius:14px; box-shadow: inset 0 2px 6px rgba(0,0,0,.06); }
-    .theme-toggle button, .mode-toggle button{ appearance:none; border:0; background:transparent; padding:8px 12px; border-radius:10px; font-weight:700; color:var(--fg); cursor:pointer; transition:transform .08s ease; }
-    .theme-toggle button.active, .mode-toggle button.active{ background:var(--primary); color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.25); }
+    .theme-toggle{ display:inline-flex; background:var(--input-bg); border:1px solid var(--divider); padding:4px; border-radius:14px; box-shadow: inset 0 2px 6px rgba(0,0,0,.06); }
+    .theme-toggle button{ appearance:none; border:0; background:transparent; padding:8px 12px; border-radius:10px; font-weight:700; color:var(--fg); cursor:pointer; transition:transform .08s ease; }
+    .theme-toggle button.active{ background:var(--primary); color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.25); }
 
     .dots span{ display:inline-block; width:8px; height:8px; background:var(--primary); border-radius:50%; margin:0 3px; animation:b 1.4s infinite ease-in-out both; }
     .dots span:nth-child(1){ animation-delay:-.32s } .dots span:nth-child(2){ animation-delay:-.16s }
@@ -97,6 +101,7 @@
           <h1>Голосовой калькулятор</h1>
           <p id="status"></p>
         </div>
+        <div id="expr"></div>
         <div id="full"></div>
         <div class="center">
           <button id="btnListen" class="btn circle"><span class="title" id="btnTitle">НАЖМИ</span></button>
@@ -119,13 +124,6 @@
             <div id="themeToggle" class="theme-toggle" role="group" aria-label="Тема">
               <button type="button" data-value="light">Светлая</button>
               <button type="button" data-value="dark">Тёмная</button>
-            </div>
-          </div>
-          <div class="field">
-            <span class="label">Режим распознавания</span>
-            <div id="modeToggle" class="mode-toggle" role="group" aria-label="Режим">
-              <button type="button" data-value="auto">Автостоп (по тишине)</button>
-              <button type="button" data-value="cont">Непрерывный</button>
             </div>
           </div>
         </div>
@@ -187,14 +185,7 @@
       if(themeToggle){ themeToggle.addEventListener('click', (e)=>{ const btn=e.target.closest('button[data-value]'); if(!btn) return; const v=btn.dataset.value; localStorage.setItem(THEME_KEY,v); applyTheme(v); setThemeUI(v); }); }
     })();
 
-    /* ===== Режим распознавания ===== */
-    const MODE_KEY='app.rec.mode';
-    const modeToggle=$('#modeToggle');
-    function setModeUI(v){ if(!modeToggle) return; modeToggle.querySelectorAll('button').forEach(btn=>btn.classList.toggle('active', btn.dataset.value===v)); }
-    function getMode(){ return localStorage.getItem(MODE_KEY) || 'auto'; }
-    (function initMode(){ const m=getMode(); setModeUI(m); if(modeToggle){ modeToggle.addEventListener('click', (e)=>{ const b=e.target.closest('button[data-value]'); if(!b) return; const v=b.dataset.value; localStorage.setItem(MODE_KEY,v); setModeUI(v); }); }})();
-
-    /* ===== Шторка (жесты) ===== */
+      /* ===== Шторка (жесты) ===== */
     const drawer=$('#drawer'), scrim=$('#scrim'), btnMenu=$('#btnMenu'), edge=$('#edge');
     let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300;
     const measure=()=>{ w=drawer.getBoundingClientRect().width||280; };
@@ -202,19 +193,35 @@
     const setPos=px=>{ pos=clamp(px,-w,0); drawer.style.transform=`translateX(${pos}px)`; const k=1+pos/w; scrim.style.opacity=(0.6*k).toFixed(3); scrim.style.pointerEvents=k>0.02?'auto':'none'; };
     const stopTr=()=>{ drawer.style.transition='none'; scrim.style.transition='none'; };
     const animateTo=px=>{ drawer.style.transition='transform 280ms cubic-bezier(.2,.8,.2,1)'; scrim.style.transition='opacity 280ms cubic-bezier(.2,.8,.2,1)'; requestAnimationFrame(()=>setPos(px)); setTimeout(stopTr,300); };
-    const openDrawer = ()=>{ measure(); isOpen=true;  animateTo(0); };
-    const closeDrawer= ()=>{ measure(); isOpen=false; animateTo(-w); };
+    const openDrawer = ()=>{ measure(); isOpen=true; edge.style.pointerEvents='none';  animateTo(0); };
+    const closeDrawer= ()=>{ measure(); isOpen=false; edge.style.pointerEvents='auto'; animateTo(-w); };
     const toggleDrawer=()=> isOpen?closeDrawer():openDrawer();
     btnMenu.addEventListener('click',e=>{ e.preventDefault(); toggleDrawer(); });
     scrim.addEventListener('click', closeDrawer);
     function beginOpen(x){ measure(); dragging=true; modeDrag='open';  startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(-w); }
     function beginClose(x){ measure(); dragging=true; modeDrag='close'; startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(0); }
     function moveTo(x){ const dx=x-startX; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
-    function endDrag(){ if(!dragging) return; dragging=false; const opened=1+pos/w; const TH=0.35, VE=0.35; if(modeDrag==='open'){ (opened>TH || vX>VE)?openDrawer():closeDrawer(); } else { (opened<(1-TH) || vX<-VE)?closeDrawer():openDrawer(); } }
+    function endDrag(e){
+      if(!dragging) return;
+      e.preventDefault();
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+      dragging=false;
+      const opened=1+pos/w;
+      const TH=0.35, VE=0.35;
+      if(modeDrag==='open'){
+        (opened>TH || vX>VE)?openDrawer():closeDrawer();
+      } else {
+        (opened<(1-TH) || vX<-VE)?closeDrawer():openDrawer();
+      }
+    }
     edge.addEventListener('pointerdown',e=>{ edge.setPointerCapture(e.pointerId); beginOpen(e.clientX); });
     edge.addEventListener('pointermove', e=>{ if(dragging&&modeDrag==='open')  moveTo(e.clientX); });
     edge.addEventListener('pointerup',   endDrag); edge.addEventListener('pointercancel',endDrag);
-    drawer.addEventListener('pointerdown',e=>{ drawer.setPointerCapture?.(e.pointerId); beginClose(e.clientX); });
+    drawer.addEventListener('pointerdown',e=>{
+      if(e.target.closest('.navbtn')) return; // allow immediate taps on menu buttons
+      drawer.setPointerCapture?.(e.pointerId);
+      beginClose(e.clientX);
+    });
     drawer.addEventListener('pointermove', e=>{ if(dragging&&modeDrag==='close') moveTo(e.clientX); });
     drawer.addEventListener('pointerup',   endDrag); drawer.addEventListener('pointercancel',endDrag);
     scrim.addEventListener('pointerdown', e=>{ scrim.setPointerCapture?.(e.pointerId); beginClose(e.clientX); });
@@ -300,8 +307,8 @@
     const TENS={ 'двадцать':20,'тридцать':30,'сорок':40,'пятьдесят':50,'шестьдесят':60,'семьдесят':70,'восемьдесят':80,'девяносто':90 };
     const HUNS={ 'сто':100,'двести':200,'триста':300,'четыреста':400,'пятьсот':500,'шестьсот':600,'семьсот':700,'восемьсот':800,'девятьсот':900 };
     const SCALE={ 'тысяча':1_000,'тысячи':1_000,'тысяч':1_000,
-                  'миллион':1_000_000,'миллиона':1_000_000,'миллионов':1_000_000,
-                  'миллиард':1_000_000_000,'миллиарда':1_000_000_000,'миллиардов':1_000_000_000 };
+                  'млн':1_000_000,'миллион':1_000_000,'миллиона':1_000_000,'миллионов':1_000_000,'миллионом':1_000_000,'миллионам':1_000_000,'миллионами':1_000_000,
+                  'млрд':1_000_000_000,'миллиард':1_000_000_000,'миллиарда':1_000_000_000,'миллиардов':1_000_000_000,'миллиардом':1_000_000_000,'миллиардам':1_000_000_000,'миллиардами':1_000_000_000 };
     const DIGITWORD={'ноль':'0','один':'1','одна':'1','два':'2','две':'2','три':'3','четыре':'4','пять':'5','шесть':'6','семь':'7','восемь':'8','девять':'9'};
 
     function tokenizeRu(s){
@@ -317,25 +324,27 @@
 
       let total = 0;  // сумма по масштабам
       let group = 0;  // текущая группа (<=999)
+      let matched = false;
 
       for (let w of tokens){
         if (w === 'и') continue;
 
-        if (/^\d+$/.test(w)) { group += parseInt(w,10); continue; }
-        if (w === 'полтора' || w === 'полторы') { group += 1.5; continue; }
+        if (/^\d+$/.test(w)) { group += parseInt(w,10); matched=true; continue; }
+        if (w === 'полтора' || w === 'полторы') { group += 1.5; matched=true; continue; }
 
-        if (HUNS[w]  !== undefined) { group += HUNS[w];  continue; }
-        if (TENS[w]  !== undefined) { group += TENS[w];  continue; }
-        if (UNITS[w] !== undefined) { group += UNITS[w]; continue; }
+        if (HUNS[w]  !== undefined) { group += HUNS[w];  matched=true; continue; }
+        if (TENS[w]  !== undefined) { group += TENS[w];  matched=true; continue; }
+        if (UNITS[w] !== undefined) { group += UNITS[w]; matched=true; continue; }
 
         if (SCALE[w] !== undefined){
           if (group === 0) group = 1;          // «миллион» без числа → 1*
           total += group * SCALE[w];
           group = 0;
+          matched = true;
           continue;
         }
       }
-      return total + group;
+      return matched ? total + group : NaN;
     }
 
     function extractNumberRu(input){
@@ -380,15 +389,16 @@
       }
 
       // полтора/пол… + масштаб + хвост
-      if (m = s.match(/^\s*(полтора|полторы)\s+(тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)\b(.*)$/i)){
+      if (m = s.match(/^\s*(полтора|полторы)\s+(тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*|млн|млрд)\b(.*)$/i)){
         const sw = m[2].toLowerCase();
-        const mult = sw.startsWith('тысяч')?1_000:(sw.startsWith('миллиард')?1_000_000_000:1_000_000);
+        const mult = sw.startsWith('тыс')?1_000:(sw.startsWith('млрд')||sw.startsWith('миллиард')?1_000_000_000:1_000_000);
         const head = 1.5 * mult; const tail = m[3].trim();
         if (tail){ const tv = parseFloat(extractNumberRu(tail)||'0')||0; return String(head + tv); }
         return String(head);
       }
-      if (m = s.match(/^\s*пол(тысячи|миллиона|миллиарда)\b(.*)$/i)){
-        const k = m[1].startsWith('тыс')?1_000:(m[1].startsWith('миллиард')?1_000_000_000:1_000_000);
+      if (m = s.match(/^\s*пол(тысячи|миллиона|миллиарда|млн|млрд)\b(.*)$/i)){
+        const sw = m[1].toLowerCase();
+        const k = sw.startsWith('тыс')?1_000:(sw.startsWith('млрд')||sw.startsWith('миллиард')?1_000_000_000:1_000_000);
         const head = 0.5 * k; const tail = (m[2]||'').trim();
         if (tail){ const tv = parseFloat(extractNumberRu(tail)||'0')||0; return String(head + tv); }
         return String(head);
@@ -433,10 +443,10 @@
       }
 
       // «N тысяч/миллион/миллиард» без хвоста
-      if (m = s.match(/^\s*(.+?)\s+(тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)\s*$/i)) {
+      if (m = s.match(/^\s*(.+?)\s+(тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*|млн|млрд)\s*$/i)) {
         const qStr = m[1].trim();
         const sw = m[2].toLowerCase();
-        const mult = sw.startsWith('тысяч')?1_000:(sw.startsWith('миллиард')?1_000_000_000:1_000_000);
+        const mult = sw.startsWith('тыс')?1_000:(sw.startsWith('млрд')||sw.startsWith('миллиард')?1_000_000_000:1_000_000);
         const q = (/^\d+$/.test(qStr)) ? parseInt(qStr,10) : wordsToNumber(qStr || 'один');
         return String((q||1) * mult);
       }
@@ -446,7 +456,8 @@
         return String(parseFloat(s.replace(',', '.')));
 
       // слова → число с масштабами
-      return String(wordsToNumber(s));
+      const num = wordsToNumber(s);
+      return isNaN(num) ? s : String(num);
     }
 
     /* ===== Форматирование вывода ===== */
@@ -467,58 +478,152 @@
     }
 
     /* ===== Разбор выражения ===== */
-// Исправление: после «умножь на» распознавание часто даёт перечисление чисел
-// («пять и три»). Раньше это сворачивалось в сумму (=8), теперь — в цепочку
-// множителей: «* пять и три» → «* пять * три». Также «X на Y» → «X * Y» даже
-// без слова «умножь» (для цифр и слов-чисел).
+// "X на Y" → "X * Y" (когда ASR съел слово «умножь»)
+function fixNaMultiplication(str){
+  // цифры: "12 на 3" → "12 * 3"
+  str = str.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/gi, '$1 * $2');
+  // слова (включая десятки/сотни/масштабы): "пять на три" → "пять * три"
+  const w = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
+  return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b','gi'), '$1 * $2');
+}
 
-function splitListForMultiply(s){
-  // Не трогаем дробные формулировки «три целых и пять десятых»
-  const fracGuard = /(\bцел(ых|ая|ое)\b|\bдесят(ых|ая|ую)\b|\bсот(ых|ая|ую)\b|\bтысячн(ых|ая|ую)\b|\bдесятитысячн(ых|ая|ую)\b|\bстотысячн(ых|ая|ую)\b|\bмиллионн(ых|ая|ую)\b|\bмиллиардн(ых|ая|ую)\b)/i;
-  if (fracGuard.test(s)) return null;
-  const chunks = s.split(/\s*(?:и|,|;)\s*/i).filter(Boolean);
-  if (chunks.length < 2) return null;
-  const nums = [];
-  for (const ch of chunks){
-    const v = extractNumberRu(ch);
-    const f = parseFloat(v);
-    if (!isFinite(f)) return null;
-    nums.push(v);
+// После "*" если идут «голые» числа или списки через запятую/«и/на», вставляем "*" между ними.
+// "* 5 3" → "* 5 * 3", "* пять, три" → "* пять * три".
+// Не ломает составные "двадцать три": десятки/сотни/масштабы не считаются «атомарными».
+function insertStarsAfterStar(str){
+  const toks = String(str).split(/\s+/).filter(Boolean);
+  const out = [];
+  let afterStar = false;
+  let prevAtomic = false; // предыдущий токен после "*" был атомарным (цифра или слово-единица)
+  const isDigitTok = t => /^\d+(?:[.,]\d+)?$/.test(t);
+  const isUnitTok = t => UNITS[t.toLowerCase()] !== undefined; // один.. девять, десять.. девятнадцать
+  const isTensOrHundOrScale = t => {
+    t = t.toLowerCase();
+    return TENS[t] !== undefined || HUNS[t] !== undefined ||
+           /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t) ||
+           t==='млн' || t==='млрд';
+  };
+  for (let i=0; i<toks.length; i++){
+    let tok = toks[i];
+    let clean = tok.replace(/[,;]+$/, '');
+    const hadSep = clean.length !== tok.length; // был разделитель в конце
+    tok = clean;
+    const low = tok.toLowerCase();
+    if (tok==='*'){
+      out.push(tok);
+      afterStar=true;
+      prevAtomic=false;
+      continue;
+    }
+    if (['+','-','/','(',')'].includes(tok)){
+      out.push(tok);
+      afterStar=false;
+      prevAtomic=false;
+      continue;
+    }
+    if (!afterStar){
+      if (tok) out.push(tok);
+      continue;
+    }
+    // внутри хвоста после "*": разделители/союзы
+    if (low==='и' || low==='на'){
+      out.push('*');
+      prevAtomic=false;
+      if (hadSep){ out.push('*'); }
+      continue;
+    }
+    if (!tok){
+      out.push('*');
+      prevAtomic=false;
+      continue;
+    }
+    const atomic = isDigitTok(tok) || isUnitTok(tok);
+    const tensHundScale = isTensOrHundOrScale(tok);
+    if (prevAtomic && atomic){
+      out.push('*');
+    }
+    out.push(tok);
+    prevAtomic = atomic && !tensHundScale;
+    if (hadSep){
+      out.push('*');
+      prevAtomic=false;
+    }
   }
-  return nums;
+  return out.join(' ');
+}
+
+// Regex-добивка: последовательно идущие цифры или слова-единицы после "*" → перемножаем.
+function insertStarsBetweenBareNumbers(str){
+  // цифры: "* 5 3" → "* 5 * 3"
+  str = str.replace(/(\*)\s*((?:\d+(?:[.,]\d+)?\s+){1,}\d+(?:[.,]\d+)?)/g,
+                     (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
+  // слова-единицы: "* пять три" → "* пять * три"
+  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять)';
+  const reg = new RegExp('(\\*)\\s*((?:' + unit + '\\s+){1,}' + unit + ')','gi');
+  str = str.replace(reg, (_, star, seq) => star + ' ' + seq.trim().replace(/\s+/g, ' * '));
+  return str;
+}
+
+// После "%" или слова "процент" если сразу идёт число/числительное,
+// вставляем "*", чтобы не получилось сложение "10% 5" → "10% * 5".
+function insertStarAfterPercent(str){
+  const unit = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
+  const reg = new RegExp('(процент(?:а|ов)?|%)\\s+(?=(?:\\d+(?:[.,]\\d+)?|'+unit+')\\b)','gi');
+  return str.replace(reg,'$1 * ');
+}
+
+// Удаляем токены, не относящиеся к числам или операциям
+function stripIrrelevantTokens(str){
+  return str.split(/\s+/).filter(tok=>{
+    if(!tok) return false;
+    if(['+','-','*','/','(',')'].includes(tok)) return true;
+    if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
+    if(/^процент(?:а|ов)?$/i.test(tok)) return true;
+    const low = tok.toLowerCase();
+    if(['и','на','с','со'].includes(low)) return true;
+    return /^\d+(?:[.,]\d+)?$/.test(tok) ||
+           UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
+           /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
+           low==='млн' || low==='млрд';
+  }).join(' ');
 }
 
 function parseExpression(textRaw){
-  const text = textRaw.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
-
-  // Если распозналось как перечисление масштабов через запятую/точку → вероятно, сложение
+  let text = textRaw.toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
+  // Возможное перечисление масштабов через запятую/точку → складываем
   let t = text
-    .replace(/((?:\d+|[а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*))\s*[\.,]\s+(?=\S)/gi, function(_, g1){ return g1 + ' плюс '; })
-    .replace(/(\S)\s*[\.,]\s+((?:\d+|[а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*))/gi, function(_, g1, g2){ return g1 + ' плюс ' + g2; })
+    .replace(/((?:\d+|[ а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|тыс\.?|миллион[а-я]*|млн\.?|миллиард[а-я]*|млрд\.?))\s*[\.,]\s+(?=\S)/gi, '$1 плюс ')
+    .replace(/(\S)\s*[\.,]\s+((?:\d+|[ а-яёa-z]+(?:\s+[а-яёa-z]+)*)\s+(?:тысяч[а-я]*|тыс\.?|миллион[а-я]*|млн\.?|миллиард[а-я]*|млрд\.?)\b)/gi, '$1 плюс $2')
     .replace(/руб(ль|ля|лей)/g,' ').replace(/коп(ейка|ейки|еек)/g,' ')
     .replace(/[−–—-]/g,'-')
     .replace(/(посчитай|посчитать|сколько будет|сколько|сосчитай|итого|в итоге|равно)/g,' ')
     .trim();
 
-  // защитим «1/2» на этапе токенизации
+  // защитим «1/2»
   t = t.replace(/\b1\s*\/\s*2\b/g,' §half§ ').replace(/½/g,' §half§ ');
 
+  // Базовая нормализация и явные операции
   t = normalizeNumeralTypos(t)
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
+    .replace(/(^|[^a-zа-яё0-9])(умнож[а-я]*|помнож[а-я]*)(?=($|[^a-zа-яё0-9]))/g,'$1 * ')
     .replace(/(раздели|разделить|подели|дели)\s+на/g,' / ')
-    .replace(/\bплюс\b/g,' + ')
-    .replace(/\bминус\b/g,' - ')
-    // безопасная подмена знака умножения — только между цифрами
-    .replace(/(\d)\s*[×xх]\s*(\d)/g, function(_, a, b){ return a + ' * ' + b; })
+    .replace(/(^|[^a-zа-яё0-9])плюс(?=($|[^a-zа-яё0-9]))/gi,'$1 + ')
+    .replace(/(^|[^a-zа-яё0-9])минус(?=($|[^a-zа-яё0-9]))/gi,'$1 - ')
+    .replace(/(\d)\s*[×xх]\s*(\d)/g,'$1 * $2') // "2 х 3"
     .replace(/[÷:]/g,'/')
     .replace(/\s+/g,' ')
     .trim();
 
-  // «X на Y» → «X * Y» для цифр
-  t = t.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/g, function(_, a, b){ return a + ' * ' + b; });
-  // «X на Y» → «X * Y» для слов-чисел (базовый словарь)
-  t = t.replace(/\b(ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот)\b\s+на\s+\b(ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот)\b/gi, function(_, a, b){ return a + ' * ' + b; });
+  // 1) «X на Y» даже без «умножь»
+  t = fixNaMultiplication(t);
+  // 2) "10% 5" → "10% * 5"
+  t = insertStarAfterPercent(t);
+  // 3) Хвост после "*": множители через пробел/"и"/запятую
+  t = insertStarsAfterStar(t);
+  t = insertStarsBetweenBareNumbers(t);
+  // 4) удаляем посторонние слова
+  t = stripIrrelevantTokens(t);
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
   const out=[], disp=[];
@@ -528,35 +633,36 @@ function parseExpression(textRaw){
     let s=part.trim();
 
     if(['+','-','*','/'].includes(s)){
-      if (s==='-' && (out.length===0 || ['+','-','*','/','('].includes(out[outlength-1]))) { pendingUnaryMinus=true; continue; }
-      out.push(s); disp.push(' ' + s + ' '); continue;
-    }
-
-    // Если предыдущий токен — умножение, а сейчас перечисление чисел,
-    // разворачиваем в цепочку множителей
-    if (out[out.length-1] === '*'){
-      const list = splitListForMultiply(s);
-      if (list){
-        for(let i=0;i<list.length;i++){
-          let n = String(list[i]);
-          if (pendingUnaryMinus){ if (!n.startsWith('-')) n='-'+n; pendingUnaryMinus=false; }
-          out.push(n); disp.push(formatNumberSpaces(n));
-          if (i < list.length-1){ out.push('*'); disp.push(' * '); }
-        }
+      if (s==='-' && (out.length===0 || ['+','-','*','/','('].includes(out[out.length-1]))) {
+        pendingUnaryMinus=true;
         continue;
       }
+      out.push(s);
+      disp.push(' ' + s + ' ');
+      continue;
     }
 
     s = s.replace(/§half§/g,'1/2');
     const m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/);
-    if(m){ const n=extractNumberRu(m[1]); out.push('(' + n + '/100)'); disp.push((m[1].trim()+'%')); pendingUnaryMinus=false; continue; }
-
+    if(m){
+      const n = extractNumberRu(m[1]);
+      out.push('(' + n + '/100)');
+      disp.push(m[1].trim()+'%');
+      pendingUnaryMinus=false;
+      continue;
+    }
     let n = extractNumberRu(s);
-    if (pendingUnaryMinus){ if (!n.startsWith('-')) n='-'+n; pendingUnaryMinus=false; }
-    out.push(n); disp.push(formatNumberSpaces(n));
+    if (pendingUnaryMinus){
+      if (!n.startsWith('-')) n='-'+n;
+      pendingUnaryMinus=false;
+    }
+    out.push(n);
+    disp.push(formatNumberSpaces(n));
   }
 
-  const sanitized = out.join(''); const display = disp.join('').trim();
+  const sanitized = out.join('');
+  const display = disp.join('').trim();
+  if(!sanitized) throw new Error('Пустое выражение');
   if(!/^[0-9+\-*/.() ]+$/.test(sanitized)) throw new Error('Недопустимые символы');
   return {display, sanitized};
 }
@@ -564,7 +670,7 @@ function parseExpression(textRaw){
 const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+')+')')(); if(!isFinite(v)||isNaN(v)) throw 0; return parseFloat(Number(v).toFixed(4)).toString(); };
 
     /* ===== UI helpers ===== */
-    const UI={ status:$('#status'), full:$('#full'), btnTitle:$('#btnTitle'),
+    const UI={ status:$('#status'), expr:$('#expr'), full:$('#full'), btnTitle:$('#btnTitle'),
       setListening(on){ this.status.innerHTML = on? '<div class="dots"><span></span><span></span><span></span></div>' : ''; if(this.btnTitle) this.btnTitle.textContent = on? 'ГОВОРИ' : 'НАЖМИ'; },
       msg(m){ if(this.status) this.status.textContent=m; }
     };
@@ -606,17 +712,41 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
         const {display,sanitized}=parseExpression(phrase);
         const out=calc(sanitized); const outFmt=formatNumberSpaces(out);
         lastPreview = { display, out: outFmt };
-        fitFullText(`${display} = ${outFmt}`);
-      }catch{ UI.full.textContent = phrase; }
+        if(UI.expr){ UI.expr.textContent=display; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+        fitFullText(outFmt);
+      }catch{
+        lastPreview = { display:'', out:'' };
+        if(UI.expr){ UI.expr.textContent=phrase; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+        fitFullText('');
+      }
     }
 
     /* ===== Вспомогательная склейка сегментов без дублей ===== */
     function mergeSegmentsNoDup(arr){
       let acc='';
       for(const raw of arr){
-        let s=String(raw||'').replace(/\s+/g,' ').trim(); if(!s) continue;
+        let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
+        if(!s) continue;
         if(!acc){ acc=s; continue; }
-        const tail = acc.split(' ').slice(-8).join(' ').trim();
+
+        const accTokens = acc.split(' ');
+        const sTokens = s.split(' ');
+        let merged=false;
+
+        for(let k=Math.min(sTokens.length, accTokens.length); k>0; k--){
+          const tailStr = accTokens.slice(-k).join(' ');
+          const headStr = sTokens.slice(0,k).join(' ');
+          const valTail = Number(extractNumberRu(tailStr));
+          const valHead = Number(extractNumberRu(headStr));
+          if(!isNaN(valTail) && !isNaN(valHead) && valTail===valHead){
+            acc = accTokens.slice(0,-k).concat(sTokens).join(' ');
+            merged=true;
+            break;
+          }
+        }
+        if(merged) continue;
+
+        const tail = accTokens.slice(-8).join(' ').trim();
         if (tail && s.startsWith(tail)) acc = acc + s.slice(tail.length);
         else if (!acc.endsWith(s)) acc = acc + ' ' + s;
       }
@@ -638,15 +768,14 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
 
       const looksIncomplete = (txt)=>/(\b(?:с|и)\s*половин)|\b[01]?\s*\/\s*2\b/i.test(txt);
       function clearSilence(){ if(silenceTimer){ clearTimeout(silenceTimer); silenceTimer=null; } }
-      function armSilence(){ clearSilence(); if(getMode()==='auto'){ silenceTimer=setTimeout(()=>{ try{ rec && rec.stop(); }catch{} }, 1500); } }
+        function armSilence(){ clearSilence(); silenceTimer=setTimeout(()=>{ try{ rec && rec.stop(); }catch{} }, 1500); }
 
-      function configure(){
-        const m=getMode();
-        rec = new SR();
-        rec.lang='ru-RU';
-        rec.interimResults=true;
-        rec.maxAlternatives=16;
-        rec.continuous = (m==='cont');
+        function configure(){
+          rec = new SR();
+          rec.lang='ru-RU';
+          rec.interimResults=true;
+          rec.maxAlternatives=16;
+          rec.continuous = false;
 
         rec.onresult = (e)=>{
           const results = Array.from(e.results||[]);
@@ -659,11 +788,11 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           if(joined){ buffer = joined; updateLive(buffer); }
           if(!looksIncomplete(joined)) armSilence(); else clearSilence();
         };
-        rec.onerror = ()=>{ if(sessionActive){ if(getMode()==='cont'){ setTimeout(()=>{ try{ rec.stop(); rec.start(); }catch{} }, 200); } else { stopSession(); } } };
-        rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; if(getMode()==='cont'){ setTimeout(()=>{ try{ rec.start(); }catch{} }, 120); } else { stopSession(); } };
+          rec.onerror = ()=>{ if(sessionActive){ stopSession(); } };
+          rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; stopSession(); };
       }
 
-      function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); buffer=''; configure(); try{ rec.start(); }catch{} }
+        function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; configure(); try{ rec.start(); }catch{} }
       function stopSession(){ if(!sessionActive) return; sessionActive=false; clearSilence(); try{ rec && rec.stop(); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
 
       recognizer.mode='web'; recognizer.available=true;
@@ -679,7 +808,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
 
         let buffer=''; let silenceTimer=null; let lastChunk='';
         function clearSilence(){ if(silenceTimer){ clearTimeout(silenceTimer); silenceTimer=null; } }
-        function armSilence(){ clearSilence(); if(getMode()==='auto'){ silenceTimer=setTimeout(()=>{ stopSession(); }, 1500); } }
+          function armSilence(){ clearSilence(); silenceTimer=setTimeout(()=>{ stopSession(); }, 1500); }
 
         function loopStart(){
           if(!sessionActive) return;
@@ -691,11 +820,10 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
               updateLive(buffer);
               if(/(с\s*половин|1\s*\/\s*2|½)/i.test(buffer)) clearSilence(); else armSilence();
             }
-            if(getMode()==='cont') loopStart();
           }, ()=>{ if(sessionActive){ setTimeout(loopStart, 150); } }, { language:'ru-RU', matches:8, showPartial:true, showPopup:false });
         }
 
-        function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); buffer=''; lastChunk='';
+          function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; lastChunk='';
           rec.hasPermission(has=>{ const go=()=>{ loopStart(); }; if(has) go(); else rec.requestPermission(go, ()=> UI.msg('Нет доступа к микрофону.')); }, ()=> UI.msg('Ошибка проверки разрешений.'));
         }
         function stopSession(){ clearSilence(); if(!sessionActive) return; sessionActive=false; try{ rec.stopListening(()=>{},()=>{}); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
