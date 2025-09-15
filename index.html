@@ -642,6 +642,14 @@ function insertStarAfterPercent(str){
   return str.replace(reg,'$1 * ');
 }
 
+// Если перед sqrt/cbrt/root идёт число или словесное числительное без знака,
+// вставляем "*" для корректного умножения: "5 корень из 5" → "5 * sqrt(5)".
+function insertStarBeforeRoots(str){
+  const num = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
+  const re = new RegExp('(^|[+\\-*/(])\\s*(' + num + ')\\s+(?=(?:sqrt|cbrt|root)\\()', 'gi');
+  return str.replace(re, (m, lead, n) => lead + n + ' * ');
+}
+
 // "два в квадрате", "пять в степени четыре", "квадратный корень из 81", "кубический корень из 8",
 // "корень третьей степени из 27" → соответствующие pow()/sqrt()/cbrt()/root()
 function normalizePowersAndRoots(str){
@@ -762,6 +770,7 @@ function parseExpression(textRaw){
   // Базовая нормализация и явные операции
   t = normalizeNumeralTypos(t);
   t = normalizePowersAndRoots(t);
+  t = insertStarBeforeRoots(t);
   t = t
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
@@ -818,6 +827,7 @@ function parseExpression(textRaw){
     if(m = s.match(/^sqrt\((.+)\)$/)){
       const arg = extractNumberRu(m[1]);
       out.push(`(${arg})**0.5`);
+      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
       disp.push(prettyMathForDisplay(`sqrt(${arg})`));
       pendingUnaryMinus=false;
       continue;
@@ -825,6 +835,7 @@ function parseExpression(textRaw){
     if(m = s.match(/^cbrt\((.+)\)$/)){
       const arg = extractNumberRu(m[1]);
       out.push(`(${arg})**(1/3)`);
+      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
       disp.push(prettyMathForDisplay(`cbrt(${arg})`));
       pendingUnaryMinus=false;
       continue;
@@ -833,6 +844,7 @@ function parseExpression(textRaw){
       const base = extractNumberRu(m[1]);
       const deg = extractNumberRu(m[2]);
       out.push(`(${base})**(1/${deg})`);
+      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
       disp.push(prettyMathForDisplay(`root(${base},${deg})`));
       pendingUnaryMinus=false;
       continue;
@@ -920,14 +932,16 @@ function replaceCalls(src,name,formatter){
 function prettyMathForDisplay(src){
   let s=String(src);
 
-  // 1) sqrt(x) -> √(x)
-  s=replaceCalls(s,'sqrt',([x])=>`√(${x})`);
+  const wrap = x => /^[\d.]+$/.test(x.trim()) ? x : `(${x})`;
 
-  // 2) cbrt(x) -> ∛(x)
-  s=replaceCalls(s,'cbrt',([x])=>`∛(${x})`);
+  // 1) sqrt(x) -> √x
+  s=replaceCalls(s,'sqrt',([x])=>`√${wrap(x)}`);
 
-  // 3) root(x,n) -> ⁿ√(x)
-  s=replaceCalls(s,'root',([x,n])=>`${toSuperscript(n||2)}√(${x})`);
+  // 2) cbrt(x) -> ∛x
+  s=replaceCalls(s,'cbrt',([x])=>`∛${wrap(x)}`);
+
+  // 3) root(x,n) -> ⁿ√x
+  s=replaceCalls(s,'root',([x,n])=>`${toSuperscript(n||2)}√${wrap(x)}`);
 
   // 4) ^целое -> надстрочный индекс (только для простых целых степеней)
   s=s.replace(/\^([\-+]?\d+)/g,(_,pow)=>toSuperscript(pow));
