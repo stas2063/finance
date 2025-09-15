@@ -784,6 +784,72 @@ function parseExpression(textRaw){
   return {display, sanitized};
 }
 
+// === КРАСИВОЕ ОТОБРАЖЕНИЕ: root/sqrt/cbrt -> знак корня, ^n -> надстрочные ===
+// перевод цифр в надстрочные символы для индекса и степеней
+function toSuperscript(str){
+  const map={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻','+':'⁺'};
+  return String(str).split('').map(ch=>map[ch]??ch).join('');
+}
+
+// парсит вызов функции вида name( ... ) с учётом вложенных скобок
+// возвращает { start, end, args[] }
+function parseCall(src,i,name){
+  const head=name+'(';
+  if(!src.startsWith(head,i)) return null;
+  let j=i+head.length,depth=1,args=[],buf='';
+  while(j<src.length && depth>0){
+    const ch=src[j];
+    if(ch==='('){ depth++; buf+=ch; }
+    else if(ch===')'){
+      depth--;
+      if(depth===0){ args.push(buf.trim()); break; }
+      buf+=ch;
+    }else if(ch===',' && depth===1){
+      args.push(buf.trim()); buf='';
+    }else{
+      buf+=ch;
+    }
+    j++;
+  }
+  return {start:i,end:j,args};
+}
+
+// вспомогательная: заменить все вызовы функции на форматтер
+function replaceCalls(src,name,formatter){
+  let out='',i=0;
+  while(i<src.length){
+    if(src.startsWith(name+'(',i)){
+      const call=parseCall(src,i,name);
+      if(call && call.args.length>0){
+        out+=formatter(call.args);
+        i=call.end+1; // позиция после закрывающей ')'
+        continue;
+      }
+    }
+    out+=src[i++];
+  }
+  return out;
+}
+
+// делает красивую строку для ДИСПЛЕЯ (не для вычисления!)
+function prettyMathForDisplay(src){
+  let s=String(src);
+
+  // 1) sqrt(x) -> √(x)
+  s=replaceCalls(s,'sqrt',([x])=>`√(${x})`);
+
+  // 2) cbrt(x) -> ∛(x)
+  s=replaceCalls(s,'cbrt',([x])=>`∛(${x})`);
+
+  // 3) root(x,n) -> ⁿ√(x)
+  s=replaceCalls(s,'root',([x,n])=>`${toSuperscript(n||2)}√(${x})`);
+
+  // 4) ^целое -> надстрочный индекс (только для простых целых степеней)
+  s=s.replace(/\^([\-+]?\d+)/g,(_,pow)=>toSuperscript(pow));
+
+  return s;
+}
+
 const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+')+')')(); if(!isFinite(v)||isNaN(v)) throw 0; return parseFloat(Number(v).toFixed(4)).toString(); };
 
     /* ===== UI helpers ===== */
@@ -836,8 +902,9 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
       }
 
       const {display,sanitized} = parsed;
-      lastPreview = { display, out:'' };
-      if(UI.expr){ UI.expr.textContent=display; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+      const pretty = prettyMathForDisplay(display);
+      lastPreview = { display: pretty, out:'' };
+      if(UI.expr){ UI.expr.textContent=pretty; UI.expr.scrollLeft=UI.expr.scrollWidth; }
 
       try{
         const out = calc(sanitized);
