@@ -260,6 +260,18 @@
         .replace(/\bтыс\.?\b/g,'тысяч')
         .replace(/\bмлн\.?\b/g,'миллион')
         .replace(/\bмлрд\.?\b/g,'миллиард')
+        // порядковые -> количественные
+        .replace(/\bперв(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'один')
+        .replace(/\bвтор(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'два')
+        .replace(/\bтрет(?:ий|ья|ье|ью|ьей|ьим|ьих|ей)\b/g,'три')
+        .replace(/\bтреть(?:я|ей|ю|е)?\b/g,'три')
+        .replace(/\bчетверт(?:ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'четыре')
+        .replace(/\bпят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'пять')
+        .replace(/\bшест(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'шесть')
+        .replace(/\bседьм(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'семь')
+        .replace(/\bвосьм(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'восемь')
+        .replace(/\bдевят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'девять')
+        .replace(/\bдесят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)\b/g,'десять')
         // «миллион/миллиард», но НЕ «миллионных/миллиардных»
         .replace(/\bмиль?и?он(?!н[а-я])([а-я]*)\b/g,'миллион$1')
         .replace(/\bмили?ард(?!н[а-я])([а-я]*)\b/g,'миллиард$1')
@@ -619,6 +631,32 @@ function insertStarAfterPercent(str){
   return str.replace(reg,'$1 * ');
 }
 
+// "два в квадрате", "пять в степени четыре", "квадратный корень из 81", "кубический корень из 8",
+// "корень третьей степени из 27" → соответствующие pow()/sqrt()/cbrt()/root()
+function normalizePowersAndRoots(str){
+  let s = String(str);
+  const ord = w=>{
+    w=w.toLowerCase().trim();
+    const map={
+      'перв':1,'втор':2,'треть':3,'трет':3,'четвер':4,'четвёр':4,
+      'пят':5,'шест':6,'седь':7,'восьм':8,'девят':9,'десят':10
+    };
+    for(const k in map){ if(w.startsWith(k)) return String(map[k]); }
+    return w;
+  };
+  // степени
+  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+квадрате/gi, (_,a)=>`pow(${a},2)`);
+  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+кубе/gi, (_,a)=>`pow(${a},3)`);
+  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+степени\s+([\d.,а-яё]+)/gi, (_,a,b)=>`pow(${a},${ord(b)})`);
+  // корни
+  s = s.replace(/квадратн[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  s = s.replace(/корень\s+квадратн[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  s = s.replace(/кубическ[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
+  s = s.replace(/корень\s+кубическ[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
+  s = s.replace(/корень\s+([\d.,а-яё]+)\s+степени\s+из\s+([\d.,а-яё]+)/gi, (_,deg,x)=>`root(${x},${ord(deg)})`);
+  return s;
+}
+
 // "две трети" → "2/3", "семь пятых" → "7/5"
 function normalizeFractions(str){
   const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
@@ -685,6 +723,7 @@ function stripIrrelevantTokens(str){
       if(['+','-','*','/','(',')'].includes(tok)) return true;
       if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
       if(/^процент(?:а|ов)?$/i.test(tok)) return true;
+      if(/^(?:pow|sqrt|cbrt|root)\(/i.test(tok)) return true;
       const low = tok.toLowerCase();
       return /^\d+(?:[.,]\d+)?$/.test(tok) ||
              UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
@@ -709,7 +748,9 @@ function parseExpression(textRaw){
   t = t.replace(/\b1\s*\/\s*2\b/g,' §half§ ').replace(/½/g,' §half§ ');
 
   // Базовая нормализация и явные операции
-  t = normalizeNumeralTypos(t)
+  t = normalizeNumeralTypos(t);
+  t = normalizePowersAndRoots(t);
+  t = t
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
     .replace(/(^|[^a-zа-яё0-9])(умнож[а-я]*|помнож[а-я]*)(?=($|[^a-zа-яё0-9]))/g,'$1 * ')
@@ -760,8 +801,40 @@ function parseExpression(textRaw){
     }
 
     s = s.replace(/§half§/g,'1/2');
-    const m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/);
-    if(m){
+
+    let m;
+    if(m = s.match(/^sqrt\((.+)\)$/)){
+      const arg = extractNumberRu(m[1]);
+      out.push(`(${arg})**0.5`);
+      disp.push(prettyMathForDisplay(`sqrt(${arg})`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+    if(m = s.match(/^cbrt\((.+)\)$/)){
+      const arg = extractNumberRu(m[1]);
+      out.push(`(${arg})**(1/3)`);
+      disp.push(prettyMathForDisplay(`cbrt(${arg})`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+    if(m = s.match(/^root\((.+),(.+)\)$/)){
+      const base = extractNumberRu(m[1]);
+      const deg = extractNumberRu(m[2]);
+      out.push(`(${base})**(1/${deg})`);
+      disp.push(prettyMathForDisplay(`root(${base},${deg})`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+    if(m = s.match(/^pow\((.+),(.*)\)$/)){
+      const base = extractNumberRu(m[1]);
+      const deg = extractNumberRu(m[2]);
+      out.push(`(${base})**(${deg})`);
+      disp.push(prettyMathForDisplay(`${base}^${deg}`));
+      pendingUnaryMinus=false;
+      continue;
+    }
+
+    if(m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/)){
       const n = extractNumberRu(m[1]);
       out.push('(' + n + '/100)');
       disp.push(formatNumberSpaces(n)+'%');
