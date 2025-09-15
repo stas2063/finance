@@ -603,17 +603,21 @@ function insertStarAfterPercent(str){
 
 // Удаляем токены, не относящиеся к числам или операциям
 function stripIrrelevantTokens(str){
-  return str.split(/\s+/).filter(tok=>{
-    if(!tok) return false;
-    if(['+','-','*','/','(',')'].includes(tok)) return true;
-    if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
-    if(/^процент(?:а|ов)?$/i.test(tok)) return true;
-    const low = tok.toLowerCase();
-    return /^\d+(?:[.,]\d+)?$/.test(tok) ||
-           UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
-           /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
-           low==='млн' || low==='млрд';
-  }).join(' ');
+  return str
+    .split(/\s+/)
+    .map(tok => tok.replace(/^[.,!?;:]+|[.,!?;:]+$/g,''))
+    .filter(tok=>{
+      if(!tok) return false;
+      if(['+','-','*','/','(',')'].includes(tok)) return true;
+      if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
+      if(/^процент(?:а|ов)?$/i.test(tok)) return true;
+      const low = tok.toLowerCase();
+      return /^\d+(?:[.,]\d+)?$/.test(tok) ||
+             UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
+             /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
+             low==='млн' || low==='млрд';
+    })
+    .join(' ');
 }
 
 function parseExpression(textRaw){
