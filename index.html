@@ -616,7 +616,7 @@ function insertStarAfterPercent(str){
   return str.replace(reg,'$1 * ');
 }
 
-// "две трети" → "2/3", "три четверти" → "3/4"
+// "две трети" → "2/3", "семь пятых" → "7/5"
 function normalizeFractions(str){
   const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
   const DEN = '('
@@ -631,8 +631,10 @@ function normalizeFractions(str){
     + 'девят(?:ая|ую|ых|и)|'
     + 'десят(?:ая|ую|ых|и)'
     + ')';
-  const re = new RegExp(`(^|\\s)(${NUM})\\s+${DEN}(?=\\s|$)`, 'gi');
-  return str.replace(re, (m, lead, numStr, denStr) => {
+
+  // 1) Строгое совпадение с формами "пятых", "четвертых" и т.п.
+  const reWords = new RegExp(`(^|\\s)(${NUM})\\s+${DEN}(?=\\s|$|[.,!?;:])`, 'gi');
+  str = str.replace(reWords, (m, lead, numStr, denStr) => {
     const num = extractNumberRu(numStr);
     const d = denStr.toLowerCase();
     let den = 0;
@@ -650,6 +652,21 @@ function normalizeFractions(str){
     }
     return m;
   });
+
+  // 2) Иногда ASR теряет окончание и отдаёт просто "семь пять" → трактуем как 7/5,
+  //    если обе части — числа <=10 и числитель не слишком большой.
+  const CARD = '(?:\\d+|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)';
+  const reCard = new RegExp(`(^|\\s)(${NUM})\\s+(${CARD})(?=\\s|$|[.,!?;:])`, 'gi');
+  str = str.replace(reCard, (m, lead, numStr, denStr) => {
+    const num = Number(extractNumberRu(numStr));
+    const den = Number(extractNumberRu(denStr));
+    if(!isNaN(num) && !isNaN(den) && num < 100 && den >= 2 && den <= 10){
+      return `${lead}${num} / ${den}`;
+    }
+    return m;
+  });
+
+  return str;
 }
 
 // Удаляем токены, не относящиеся к числам или операциям
