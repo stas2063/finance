@@ -565,6 +565,28 @@ function insertStarsBetweenBareNumbers(str){
   return str;
 }
 
+// "* пять и три" / "* 5, 3" / "* пять, три" → "* пять * три"
+function expandMultiplicativeList(str){
+  return str.replace(/(\*)(\s*)([^+\-*/]+)/g, (m, star, sp, tail)=>{
+    const parts = tail
+      .replace(/[,;]+/g, ' и ')
+      .split(/\s+и\s+/)
+      .map(s=>s.trim())
+      .filter(Boolean);
+    if(parts.length<=1) return m;
+    const isNumWord = t=>{
+      t=t.toLowerCase();
+      return /^\d+(?:[.,]\d+)?$/.test(t) ||
+             UNITS[t]!==undefined || TENS[t]!==undefined || HUNS[t]!==undefined ||
+             /^тысяч/.test(t) || /^миллион/.test(t) || /^миллиард/.test(t) ||
+             t==='млн' || t==='млрд';
+    };
+    const ok = parts.every(p=>p.split(/\s+/).every(isNumWord));
+    if(!ok) return m;
+    return star + ' ' + parts.join(' * ');
+  });
+}
+
 // После "%" или слова "процент" если сразу идёт число/числительное,
 // вставляем "*", чтобы не получилось сложение "10% 5" → "10% * 5".
 function insertStarAfterPercent(str){
@@ -621,6 +643,7 @@ function parseExpression(textRaw){
   // 2) "10% 5" → "10% * 5"
   t = insertStarAfterPercent(t);
   // 3) Хвост после "*": множители через пробел/"и"/запятую
+  t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
   t = insertStarsBetweenBareNumbers(t);
   // 4) удаляем посторонние слова
