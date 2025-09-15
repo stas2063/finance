@@ -601,6 +601,21 @@ function insertStarAfterPercent(str){
   return str.replace(reg,'$1 * ');
 }
 
+// "три четвертых" → "3 / 4"
+function normalizeFractions(str){
+  const roots={
+    'втор':2,'трет':3,'четверт':4,'пят':5,'шест':6,
+    'седьм':7,'восьм':8,'девят':9,'десят':10
+  };
+  const w='(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*|млн|млрд)';
+  const re=new RegExp('(^|\\s)(\\d+(?:[.,]\\d+)?|'+w+')\\s+(втор|трет|четверт|пят|шест|седьм|восьм|девят|десят)[а-я]*','gi');
+  return str.replace(re,(m,lead,num,root)=>{
+    const n=extractNumberRu(num);
+    const d=roots[root.toLowerCase()];
+    return lead + n+' / '+d;
+  });
+}
+
 // Удаляем токены, не относящиеся к числам или операциям
 function stripIrrelevantTokens(str){
   return str
@@ -652,6 +667,8 @@ function parseExpression(textRaw){
   t = fixNaMultiplication(t);
   // 2) "10% 5" → "10% * 5"
   t = insertStarAfterPercent(t);
+  // 2b) дроби вида "три четвертых" → "3 / 4"
+  t = normalizeFractions(t);
   // 3) Хвост после "*": множители через пробел/"и"/запятую
   t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
