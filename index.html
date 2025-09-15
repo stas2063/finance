@@ -744,15 +744,26 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     let lastPreview = { display:'', out:'' };
     function updateLive(phrase){
       if(!phrase) return; // ничего не считаем
+      let parsed;
       try{
-        const {display,sanitized}=parseExpression(phrase);
-        const out=calc(sanitized); const outFmt=formatNumberSpaces(out);
-        lastPreview = { display, out: outFmt };
-        if(UI.expr){ UI.expr.textContent=display; UI.expr.scrollLeft=UI.expr.scrollWidth; }
-        fitFullText(outFmt);
+        parsed = parseExpression(phrase);
       }catch{
         lastPreview = { display:'', out:'' };
-        if(UI.expr){ UI.expr.textContent=phrase; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+        if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; }
+        fitFullText('');
+        return;
+      }
+
+      const {display,sanitized} = parsed;
+      lastPreview = { display, out:'' };
+      if(UI.expr){ UI.expr.textContent=display; UI.expr.scrollLeft=UI.expr.scrollWidth; }
+
+      try{
+        const out = calc(sanitized);
+        const outFmt = formatNumberSpaces(out);
+        lastPreview.out = outFmt;
+        fitFullText(outFmt);
+      }catch{
         fitFullText('');
       }
     }
