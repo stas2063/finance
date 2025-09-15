@@ -606,6 +606,7 @@ function stripIrrelevantTokens(str){
   return str
     .split(/\s+/)
     .map(tok => tok.replace(/^[.,!?;:]+|[.,!?;:]+$/g,''))
+    .map(tok => tok.replace(/[×xх]/g,'*').replace(/[÷:]/g,'/'))
     .filter(tok=>{
       if(!tok) return false;
       if(['+','-','*','/','(',')'].includes(tok)) return true;
@@ -672,7 +673,8 @@ function parseExpression(textRaw){
         continue;
       }
       out.push(s);
-      disp.push(' ' + s + ' ');
+      const opDisplay = s==='*' ? '×' : s==='/' ? '÷' : s;
+      disp.push(' ' + opDisplay + ' ');
       continue;
     }
 
