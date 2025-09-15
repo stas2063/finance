@@ -689,7 +689,7 @@ function parseExpression(textRaw){
   // 4) удаляем посторонние слова
   t = stripIrrelevantTokens(t);
   // 5) схлопываем дублирующиеся операторы ("- -" → "-")
-  t = t.replace(/([+\-*/])\s+\1+/g,'$1');
+  t = t.replace(/([+\-*/])\s*\1+/g,'$1');
 
   const parts = t.split(/([+\-*/])/).filter(p=>p.trim()!=='');
   const out=[], disp=[];
