@@ -484,7 +484,8 @@ function fixNaMultiplication(str){
   str = str.replace(/(\d+(?:[.,]\d+)?)\s+на\s+(\d+(?:[.,]\d+)?)/gi, '$1 * $2');
   // слова (включая десятки/сотни/масштабы): "пять на три" → "пять * три"
   const w = '(?:ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|тысяч[а-я]*|миллион[а-я]*|миллиард[а-я]*)';
-  return str.replace(new RegExp('\\b(' + w + ')\\b\\s+на\\s+\\b(' + w + ')\\b','gi'), '$1 * $2');
+  const re = new RegExp('(^|\s)('+w+')\s+на\s+('+w+')(?=\s|$)','gi');
+  return str.replace(re, (m, lead,a,b)=> lead+a+' * '+b);
 }
 
 // После "*" если идут «голые» числа или списки через запятую/«и/на», вставляем "*" между ними.
@@ -580,7 +581,6 @@ function stripIrrelevantTokens(str){
     if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
     if(/^процент(?:а|ов)?$/i.test(tok)) return true;
     const low = tok.toLowerCase();
-    if(['и','на','с','со'].includes(low)) return true;
     return /^\d+(?:[.,]\d+)?$/.test(tok) ||
            UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
            /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
@@ -647,7 +647,7 @@ function parseExpression(textRaw){
     if(m){
       const n = extractNumberRu(m[1]);
       out.push('(' + n + '/100)');
-      disp.push(m[1].trim()+'%');
+      disp.push(formatNumberSpaces(n)+'%');
       pendingUnaryMinus=false;
       continue;
     }
