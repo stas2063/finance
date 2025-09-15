@@ -582,7 +582,10 @@ function collapseRepeatedStars(str){
 
 // Если оператор пропал, а осталось только "1380 4" → добавим "+" → "1380 + 4"
 function insertPlusBetweenNumbers(str){
-  return str.replace(/(\d+(?:\s\d{3})*)\s(\d{1,2})(?=($|[^0-9]))/g,'$1 + $2');
+  return str.replace(/(\d+(?:\s\d{3})*)\s(\d{1,2})(?=($|[^0-9]))/g,(m,a,b)=>{
+    const first = parseInt(a.replace(/\s/g,''),10);
+    return first>=100 ? `${a} + ${b}` : m;
+  });
 }
 
 // "* пять и три" / "* 5, 3" / "* пять, три" → "* пять * три"
@@ -657,7 +660,9 @@ function normalizeFractions(str){
   //    если обе части — числа <=10 и числитель не слишком большой.
   const CARD = '(?:\\d+|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)';
   const reCard = new RegExp(`(^|\\s)(${NUM})\\s+(${CARD})(?=\\s|$|[.,!?;:])`, 'gi');
-  str = str.replace(reCard, (m, lead, numStr, denStr) => {
+  str = str.replace(reCard, (m, lead, numStr, denStr, offset, s) => {
+    const prev = s[offset-1];
+    if(prev==='*' || prev==='/') return m;
     const num = Number(extractNumberRu(numStr));
     const den = Number(extractNumberRu(denStr));
     if(!isNaN(num) && !isNaN(den) && num < 100 && den >= 2 && den <= 10){
