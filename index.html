@@ -1232,7 +1232,46 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
         if(!acc){ acc=s; continue; }
 
         const accTokens = acc.split(' ').filter(Boolean);
-        const sTokens = s.split(' ').filter(Boolean);
+        let sTokens = s.split(' ').filter(Boolean);
+
+        if(accTokens.length>=2 && sTokens.length){
+          const lastTokRaw = accTokens[accTokens.length-1] || '';
+          const opNorm = lastTokRaw.toLowerCase().replace(/[^+\-*/а-яё]/g,'');
+          if(opNorm==='-' || opNorm==='минус' || opNorm==='+' || opNorm==='плюс'){
+            const isNumPart = tok => {
+              const low = tok.toLowerCase().replace(/[.,!?;:]/g,'');
+              if(!low) return false;
+              if(low==='и') return true;
+              if(/^\d+(?:[.,]\d+)?$/.test(low)) return true;
+              if(UNITS[low]!==undefined || TENS[low]!==undefined || HUNS[low]!==undefined) return true;
+              if(/^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) || low==='млн' || low==='млрд') return true;
+              return false;
+            };
+            let start = accTokens.length-2;
+            while(start>=0 && isNumPart(accTokens[start])) start--;
+            start++;
+            const prevPhraseTokens = accTokens.slice(start, accTokens.length-1);
+            const prevPhrase = prevPhraseTokens.join(' ');
+            const prevVal = Number(extractNumberRu(prevPhrase));
+            if(!isNaN(prevVal)){
+              let dropLen = 0;
+              for(let len=1; len<=sTokens.length; len++){
+                const prefix = sTokens.slice(0,len).join(' ');
+                const prefixVal = Number(extractNumberRu(prefix));
+                if(!isNaN(prefixVal) && prefixVal===prevVal){
+                  dropLen = len;
+                  break;
+                }
+              }
+              if(dropLen){
+                sTokens = sTokens.slice(dropLen);
+                s = sTokens.join(' ');
+                if(!sTokens.length) continue;
+              }
+            }
+          }
+        }
+
         let merged=false;
 
         for(let k=Math.min(sTokens.length, accTokens.length); k>0; k--){
