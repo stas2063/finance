@@ -427,12 +427,7 @@
           if(!btn) return;
           const mode=btn.dataset.value;
           if(mode!=='light' && mode!=='dark') return;
-          if(btn.classList.contains('active') && themeMode===mode){
-            saveTheme('system');
-            applyTheme('system');
-            setThemeUI('system');
-            return;
-          }
+          if(themeMode===mode) return;
           saveTheme(mode);
           applyTheme(mode);
           setThemeUI(mode);
