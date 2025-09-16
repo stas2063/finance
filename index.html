@@ -1487,7 +1487,17 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; stopSession(); };
       }
 
-        function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; configure(); try{ rec.start(); }catch{} }
+        function startSession(){
+          if(sessionActive) return;
+          sessionActive=true;
+          UI.setListening(true);
+          fitFullText('');
+          if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; }
+          lastPreview = { display:'', out:'' };
+          buffer='';
+          configure();
+          try{ rec.start(); }catch{}
+        }
       function stopSession(){ if(!sessionActive) return; sessionActive=false; clearSilence(); try{ rec && rec.stop(); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
 
       recognizer.mode='web'; recognizer.available=true;
@@ -1518,7 +1528,15 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           }, ()=>{ if(sessionActive){ setTimeout(loopStart, 150); } }, { language:'ru-RU', matches:8, showPartial:true, showPopup:false });
         }
 
-          function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; lastChunk='';
+          function startSession(){
+            if(sessionActive) return;
+            sessionActive=true;
+            UI.setListening(true);
+            fitFullText('');
+            if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; }
+            lastPreview = { display:'', out:'' };
+            buffer='';
+            lastChunk='';
           rec.hasPermission(has=>{ const go=()=>{ loopStart(); }; if(has) go(); else rec.requestPermission(go, ()=> UI.msg('Нет доступа к микрофону.')); }, ()=> UI.msg('Ошибка проверки разрешений.'));
         }
         function stopSession(){ clearSilence(); if(!sessionActive) return; sessionActive=false; try{ rec.stopListening(()=>{},()=>{}); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
