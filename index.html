@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -8,6 +8,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+  <script>
+    (function initThemeEarly(){
+      const KEY='app.theme';
+      const prefersDark=()=>window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      let theme='light';
+      try{
+        const saved=localStorage.getItem(KEY);
+        theme = saved || (prefersDark() ? 'dark' : 'light');
+      }catch(err){
+        theme = prefersDark() ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <style>
     :root{ --bg:#f0f2f5; --fg:#111; --muted:#666; --primary:#0a84ff; --card:#fff; --divider: rgba(0,0,0,.08); --input-bg:#fff;
       --safe-top: env(safe-area-inset-top); --safe-left: env(safe-area-inset-left); --safe-right: env(safe-area-inset-right); --safe-bottom: env(safe-area-inset-bottom); }
@@ -192,13 +206,37 @@
     /* ===== Тема ===== */
     const THEME_KEY='app.theme';
     const themeToggle=$('#themeToggle');
+    const mediaDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    const systemThemeListener = e=>{
+      if(getStoredTheme()) return;
+      const next = e.matches ? 'dark' : 'light';
+      applyTheme(next);
+      setThemeUI(next);
+    };
     function applyTheme(v){ document.documentElement.setAttribute('data-theme', v); }
     function setThemeUI(v){ if(!themeToggle) return; themeToggle.querySelectorAll('button').forEach(btn=>{ btn.classList.toggle('active', btn.dataset.value===v); }); }
+    function getStoredTheme(){ try{ return localStorage.getItem(THEME_KEY); }catch(_){ return null; } }
+    function saveTheme(v){ try{ localStorage.setItem(THEME_KEY,v); }catch(_){ /* ignore */ } }
     (function initTheme(){
-      const saved = localStorage.getItem(THEME_KEY);
-      const initial = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      applyTheme(initial); setThemeUI(initial);
-      if(themeToggle){ themeToggle.addEventListener('click', (e)=>{ const btn=e.target.closest('button[data-value]'); if(!btn) return; const v=btn.dataset.value; localStorage.setItem(THEME_KEY,v); applyTheme(v); setThemeUI(v); }); }
+      const saved = getStoredTheme();
+      const attrTheme = document.documentElement.getAttribute('data-theme');
+      const initial = saved || attrTheme || (mediaDark && mediaDark.matches ? 'dark' : 'light');
+      applyTheme(initial);
+      setThemeUI(initial);
+      if(mediaDark){
+        if(mediaDark.addEventListener) mediaDark.addEventListener('change', systemThemeListener);
+        else if(mediaDark.addListener) mediaDark.addListener(systemThemeListener);
+      }
+      if(themeToggle){
+        themeToggle.addEventListener('click', (e)=>{
+          const btn=e.target.closest('button[data-value]');
+          if(!btn) return;
+          const v=btn.dataset.value;
+          saveTheme(v);
+          applyTheme(v);
+          setThemeUI(v);
+        });
+      }
     })();
 
       /* ===== Шторка (жесты) ===== */
