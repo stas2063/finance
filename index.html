@@ -203,7 +203,7 @@
 
       /* ===== Шторка (жесты) ===== */
     const drawer=$('#drawer'), scrim=$('#scrim'), btnMenu=$('#btnMenu'), edge=$('#edge');
-    let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300;
+    let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300, moved=false;
     const measure=()=>{ w=drawer.getBoundingClientRect().width||280; };
     const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
     const setPos=px=>{ pos=clamp(px,-w,0); drawer.style.transform=`translateX(${pos}px)`; const k=1+pos/w; scrim.style.opacity=(0.6*k).toFixed(3); scrim.style.pointerEvents=k>0.02?'auto':'none'; };
@@ -214,16 +214,35 @@
     const toggleDrawer=()=> isOpen?closeDrawer():openDrawer();
     btnMenu.addEventListener('click',e=>{ e.preventDefault(); toggleDrawer(); });
     scrim.addEventListener('click', closeDrawer);
-    function swallowClick(){
-      const h=e=>{ e.stopPropagation(); e.preventDefault(); window.removeEventListener('click',h,true); };
-      window.addEventListener('click',h,true);
+    let swallowTimer=0;
+    let swallowCleanup=null;
+    function swallowClick(allowSelector){
+      if(swallowCleanup){ swallowCleanup(); }
+      const handler=e=>{
+        if(allowSelector && e.target.closest(allowSelector)){
+          cleanup();
+          return;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+        cleanup();
+      };
+      const cleanup=()=>{
+        window.removeEventListener('click',handler,true);
+        if(swallowTimer){ clearTimeout(swallowTimer); swallowTimer=0; }
+        swallowCleanup=null;
+      };
+      swallowCleanup=cleanup;
+      window.addEventListener('click',handler,true);
+      swallowTimer=setTimeout(cleanup,300);
     }
-    function beginOpen(x){ measure(); dragging=true; modeDrag='open';  startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(-w); }
-    function beginClose(x){ measure(); dragging=true; modeDrag='close'; startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(0); }
-    function moveTo(x){ const dx=x-startX; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
+    function beginOpen(x){ measure(); dragging=true; modeDrag='open';  startX=lastX=x; lastT=performance.now(); vX=0; moved=false; stopTr(); setPos(-w); }
+    function beginClose(x){ measure(); dragging=true; modeDrag='close'; startX=lastX=x; lastT=performance.now(); vX=0; moved=false; stopTr(); setPos(0); }
+    function moveTo(x){ const dx=x-startX; if(!moved && Math.abs(dx)>6) moved=true; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
     function endDrag(e){
       if(!dragging) return;
-      swallowClick();
+      const allowSelector = modeDrag==='open' ? '.navbtn' : null;
+      if(moved) swallowClick(allowSelector);
       e.currentTarget.releasePointerCapture?.(e.pointerId);
       dragging=false;
       const opened=1+pos/w;
