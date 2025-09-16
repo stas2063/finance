@@ -748,7 +748,7 @@ function normalizeFractions(str){
   const DEN = '('
     + 'половин[а-я]*|'
     + 'втор(?:ая|ой|ую|ых|их)|'
-    + 'трет(?:ья|ью|ей|и|их)|'
+    + 'трет(?:ья|ью|ей|и|их|ь(?:я|ью|ей|и|их)?)|'
     + 'четверт(?:ь|и|ую|ых|ой)|'
     + 'пят(?:ая|ую|ых|и)|'
     + 'шест(?:ая|ую|ых|и)|'
@@ -763,16 +763,17 @@ function normalizeFractions(str){
   str = str.replace(reWords, (m, lead, numStr, denStr) => {
     const num = extractNumberRu(numStr);
     const d = denStr.toLowerCase();
+    const dNorm = d.replace(/ь/g,'');
     let den = 0;
-    if(/^пол|^втор/.test(d)) den = 2;
-    else if(/^трет/.test(d)) den = 3;
-    else if(/^четверт/.test(d)) den = 4;
-    else if(/^пят/.test(d)) den = 5;
-    else if(/^шест/.test(d)) den = 6;
-    else if(/^седьм/.test(d)) den = 7;
-    else if(/^восьм/.test(d)) den = 8;
-    else if(/^девят/.test(d)) den = 9;
-    else if(/^десят/.test(d)) den = 10;
+    if(/^пол|^втор/.test(dNorm)) den = 2;
+    else if(/^трет/.test(dNorm)) den = 3;
+    else if(/^четверт/.test(dNorm)) den = 4;
+    else if(/^пят/.test(dNorm)) den = 5;
+    else if(/^шест/.test(dNorm)) den = 6;
+    else if(/^седьм/.test(dNorm)) den = 7;
+    else if(/^восьм/.test(dNorm)) den = 8;
+    else if(/^девят/.test(dNorm)) den = 9;
+    else if(/^десят/.test(dNorm)) den = 10;
     if(!isNaN(Number(num)) && den){
       return `${lead}${num} / ${den}`;
     }
