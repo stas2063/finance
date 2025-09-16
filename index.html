@@ -959,97 +959,23 @@ function insertStarAfterPercent(str){
   const reg = new RegExp('(процент(?:а|ов)?|%)\\s+(?=(?:\\d+(?:[.,]\\d+)?|'+unit+')(?:\\s|$))','gi');
   return str.replace(reg,'$1 * ');
 }
-
-// Если перед sqrt/cbrt/root идёт число или словесное числительное без знака,
-// вставляем "*" для корректного умножения: "5 корень из 5" → "5 * sqrt(5)".
-function insertStarBeforeRoots(str){
-  const num = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
-  const re = new RegExp('(^|[+\\-*/(])\\s*(' + num + ')\\s+(?=(?:sqrt|cbrt|root)\\()', 'gi');
-  return str.replace(re, (m, lead, n) => lead + n + ' * ');
+function stripFractionPhrases(str){
+  const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
+  const DEN = '(?:половин[а-я]*|втор(?:ая|ой|ую|ых|их)|трет(?:ья|ью|ей|и|их|ь(?:я|ью|ей|и|их)?)|четверт(?:ь|и|ую|ых|ой)|пят(?:ая|ую|ых|и)|шест(?:ая|ую|ых|и)|седьм(?:ая|ую|ых|и)|восьм(?:ая|ую|ых|и)|девят(?:ая|ую|ых|и)|десят(?:ая|ую|ых|и))';
+  const re = new RegExp(`(^|\\s)${NUM}\\s+${DEN}(?=\\s|$|[.,!?;:])`, 'gi');
+  return str.replace(re, (match, lead) => lead || ' ');
 }
 
-// "два в квадрате", "пять в степени четыре", "квадратный корень из 81", "кубический корень из 8",
-// "корень третьей степени из 27" → соответствующие pow()/sqrt()/cbrt()/root()
-function normalizePowersAndRoots(str){
+function stripRootsAndPowers(str){
+  const TERM = '(?:[а-яё0-9.,]+(?:\\s+[а-яё0-9.,]+)*)';
   let s = String(str);
-  const ord = w=>{
-    w=w.toLowerCase().trim();
-    const map={
-      'перв':1,'втор':2,'треть':3,'трет':3,'четвер':4,'четвёр':4,
-      'пят':5,'шест':6,'седь':7,'восьм':8,'девят':9,'десят':10
-    };
-    for(const k in map){ if(w.startsWith(k)) return String(map[k]); }
-    return w;
-  };
-  // степени
-  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+квадрате/gi, (_,a)=>`pow(${a},2)`);
-  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+кубе/gi, (_,a)=>`pow(${a},3)`);
-  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+степени\s+([\d.,а-яё]+)/gi, (_,a,b)=>`pow(${a},${ord(b)})`);
-  // корни
-  s = s.replace(/квадратн[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
-  s = s.replace(/корень\s+квадратн[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
-  s = s.replace(/кубическ[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
-  s = s.replace(/корень\s+кубическ[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
-  s = s.replace(/корень\s+([\d.,а-яё]+)\s+степени\s+из\s+([\d.,а-яё]+)/gi, (_,deg,x)=>`root(${x},${ord(deg)})`);
-  s = s.replace(/корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  const rootPattern = new RegExp(`(?:квадратн[а-я]*\\s+корень|кубическ[а-я]*\\s+корень|корень(?:\\s+[а-яё]+)*)\\s+из\\s+${TERM}`, 'gi');
+  s = s.replace(rootPattern, ' ');
+  const powerPattern = new RegExp(`${TERM}\\s+в\\s+(?:квадрате|кубе|степени\\s+${TERM})`, 'gi');
+  s = s.replace(powerPattern, ' ');
   return s;
 }
 
-// "две трети" → "2/3", "семь пятых" → "7/5"
-function normalizeFractions(str){
-  const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
-  const DEN = '('
-    + 'половин[а-я]*|'
-    + 'втор(?:ая|ой|ую|ых|их)|'
-    + 'трет(?:ья|ью|ей|и|их|ь(?:я|ью|ей|и|их)?)|'
-    + 'четверт(?:ь|и|ую|ых|ой)|'
-    + 'пят(?:ая|ую|ых|и)|'
-    + 'шест(?:ая|ую|ых|и)|'
-    + 'седьм(?:ая|ую|ых|и)|'
-    + 'восьм(?:ая|ую|ых|и)|'
-    + 'девят(?:ая|ую|ых|и)|'
-    + 'десят(?:ая|ую|ых|и)'
-    + ')';
-
-  // 1) Строгое совпадение с формами "пятых", "четвертых" и т.п.
-  const reWords = new RegExp(`(^|\\s)(${NUM})\\s+${DEN}(?=\\s|$|[.,!?;:])`, 'gi');
-  str = str.replace(reWords, (m, lead, numStr, denStr) => {
-    const num = extractNumberRu(numStr);
-    const d = denStr.toLowerCase();
-    const dNorm = d.replace(/ь/g,'');
-    let den = 0;
-    if(/^пол|^втор/.test(dNorm)) den = 2;
-    else if(/^трет/.test(dNorm)) den = 3;
-    else if(/^четверт/.test(dNorm)) den = 4;
-    else if(/^пят/.test(dNorm)) den = 5;
-    else if(/^шест/.test(dNorm)) den = 6;
-    else if(/^седьм/.test(dNorm)) den = 7;
-    else if(/^восьм/.test(dNorm)) den = 8;
-    else if(/^девят/.test(dNorm)) den = 9;
-    else if(/^десят/.test(dNorm)) den = 10;
-    if(!isNaN(Number(num)) && den){
-      return `${lead}${num} / ${den}`;
-    }
-    return m;
-  });
-
-  // 2) Иногда ASR теряет окончание и отдаёт просто "семь пять" → трактуем как 7/5,
-  //    если обе части — числа <=10 и числитель не слишком большой.
-  const CARD = '(?:\\d+|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)';
-  const reCard = new RegExp(`(^|\\s)(${NUM})\\s+(${CARD})(?=\\s|$|[.,!?;:])`, 'gi');
-  str = str.replace(reCard, (m, lead, numStr, denStr, offset, s) => {
-    const prev = s[offset-1];
-    if(prev==='*' || prev==='/') return m;
-    const num = Number(extractNumberRu(numStr));
-    const den = Number(extractNumberRu(denStr));
-    if(!isNaN(num) && !isNaN(den) && num < 100 && den >= 2 && den <= 10){
-      return `${lead}${num} / ${den}`;
-    }
-    return m;
-  });
-
-  return str;
-}
 
 // Удаляем токены, не относящиеся к числам или операциям
 function stripIrrelevantTokens(str){
@@ -1062,7 +988,6 @@ function stripIrrelevantTokens(str){
       if(['+','-','*','/','(',')'].includes(tok)) return true;
       if(/^[-+]?\d+(?:[.,]\d+)?%$/.test(tok)) return true;
       if(/^процент(?:а|ов)?$/i.test(tok)) return true;
-      if(/^(?:pow|sqrt|cbrt|root)\(/i.test(tok)) return true;
       const low = tok.toLowerCase();
       return /^[-+]?\d+(?:[.,]\d+)?$/.test(tok) ||
              UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
@@ -1083,13 +1008,8 @@ function parseExpression(textRaw){
     .replace(/(посчитай|посчитать|сколько будет|сколько|сосчитай|итого|в итоге|равно)/g,' ')
     .trim();
 
-  // защитим «1/2»
-  t = t.replace(/\b1\s*\/\s*2\b/g,' §half§ ').replace(/½/g,' §half§ ');
-
-  // Базовая нормализация и явные операции
+    // Базовая нормализация и явные операции
   t = normalizeNumeralTypos(t);
-  t = normalizePowersAndRoots(t);
-  t = insertStarBeforeRoots(t);
   t = t
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
@@ -1108,8 +1028,8 @@ function parseExpression(textRaw){
   t = fixNaDivision(t);
   // 2) "10% 5" → "10% * 5"
   t = insertStarAfterPercent(t);
-  // 2b) "две трети" → "2/3"
-  t = normalizeFractions(t);
+  t = stripRootsAndPowers(t);
+  t = stripFractionPhrases(t);
   // 3) Хвост после "*": множители через пробел/"и"/запятую
   t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
@@ -1140,43 +1060,8 @@ function parseExpression(textRaw){
       continue;
     }
 
-    s = s.replace(/§half§/g,'1/2');
 
     let m;
-    if(m = s.match(/^sqrt\((.+)\)$/)){
-      const arg = extractNumberRu(m[1]);
-      out.push(`(${arg})**0.5`);
-      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
-      disp.push(prettyMathForDisplay(`sqrt(${arg})`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-    if(m = s.match(/^cbrt\((.+)\)$/)){
-      const arg = extractNumberRu(m[1]);
-      out.push(`(${arg})**(1/3)`);
-      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
-      disp.push(prettyMathForDisplay(`cbrt(${arg})`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-    if(m = s.match(/^root\((.+),(.+)\)$/)){
-      const base = extractNumberRu(m[1]);
-      const deg = extractNumberRu(m[2]);
-      out.push(`(${base})**(1/${deg})`);
-      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
-      disp.push(prettyMathForDisplay(`root(${base},${deg})`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-    if(m = s.match(/^pow\((.+),(.*)\)$/)){
-      const base = extractNumberRu(m[1]);
-      const deg = extractNumberRu(m[2]);
-      out.push(`(${base})**(${deg})`);
-      disp.push(prettyMathForDisplay(`${base}^${deg}`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-
     if(m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/)){
       const n = extractNumberRu(m[1]);
       out.push('(' + n + '/100)');
@@ -1200,72 +1085,8 @@ function parseExpression(textRaw){
   return {display, sanitized};
 }
 
-// === КРАСИВОЕ ОТОБРАЖЕНИЕ: root/sqrt/cbrt -> знак корня, ^n -> надстрочные ===
-// перевод цифр в надстрочные символы для индекса и степеней
-function toSuperscript(str){
-  const map={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻','+':'⁺'};
-  return String(str).split('').map(ch=>map[ch]??ch).join('');
-}
-
-// парсит вызов функции вида name( ... ) с учётом вложенных скобок
-// возвращает { start, end, args[] }
-function parseCall(src,i,name){
-  const head=name+'(';
-  if(!src.startsWith(head,i)) return null;
-  let j=i+head.length,depth=1,args=[],buf='';
-  while(j<src.length && depth>0){
-    const ch=src[j];
-    if(ch==='('){ depth++; buf+=ch; }
-    else if(ch===')'){
-      depth--;
-      if(depth===0){ args.push(buf.trim()); break; }
-      buf+=ch;
-    }else if(ch===',' && depth===1){
-      args.push(buf.trim()); buf='';
-    }else{
-      buf+=ch;
-    }
-    j++;
-  }
-  return {start:i,end:j,args};
-}
-
-// вспомогательная: заменить все вызовы функции на форматтер
-function replaceCalls(src,name,formatter){
-  let out='',i=0;
-  while(i<src.length){
-    if(src.startsWith(name+'(',i)){
-      const call=parseCall(src,i,name);
-      if(call && call.args.length>0){
-        out+=formatter(call.args);
-        i=call.end+1; // позиция после закрывающей ')'
-        continue;
-      }
-    }
-    out+=src[i++];
-  }
-  return out;
-}
-
-// делает красивую строку для ДИСПЛЕЯ (не для вычисления!)
 function prettyMathForDisplay(src){
-  let s=String(src);
-
-  const wrap = x => /^[\d.]+$/.test(x.trim()) ? x : `(${x})`;
-
-  // 1) sqrt(x) -> √x
-  s=replaceCalls(s,'sqrt',([x])=>`√${wrap(x)}`);
-
-  // 2) cbrt(x) -> ∛x
-  s=replaceCalls(s,'cbrt',([x])=>`∛${wrap(x)}`);
-
-  // 3) root(x,n) -> ⁿ√x
-  s=replaceCalls(s,'root',([x,n])=>`${toSuperscript(n||2)}√${wrap(x)}`);
-
-  // 4) ^целое -> надстрочный индекс (только для простых целых степеней)
-  s=s.replace(/\^([\-+]?\d+)/g,(_,pow)=>toSuperscript(pow));
-
-  return s;
+  return String(src);
 }
 
 const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+')+')')(); if(!isFinite(v)||isNaN(v)) throw 0; return parseFloat(Number(v).toFixed(4)).toString(); };
