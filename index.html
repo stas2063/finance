@@ -270,7 +270,33 @@
     /* ===== Навигация ===== */
     const views={calc:'#view-calc',settings:'#view-settings',about:'#view-about'};
     const showView=k=>{ Object.values(views).forEach(sel=>document.querySelector(sel).classList.remove('active')); (document.querySelector(views[k])||document.querySelector(views.calc)).classList.add('active'); };
-    $$('.navbtn').forEach(b=> b.addEventListener('click',()=>{ showView(b.dataset.view); closeDrawer(); }));
+    const activateNav=view=>{ showView(view); closeDrawer(); };
+    $$('.navbtn').forEach(btn=>{
+      let pointerActive=false;
+      let suppressClick=false;
+      const view=btn.dataset.view;
+      btn.addEventListener('pointerdown',e=>{
+        if(e.pointerType==='mouse' && e.button!==0) return;
+        pointerActive=true;
+        if(typeof swallowCleanup==='function') swallowCleanup();
+      });
+      const resetPointer=()=>{ pointerActive=false; };
+      btn.addEventListener('pointerleave', resetPointer);
+      btn.addEventListener('pointercancel', resetPointer);
+      btn.addEventListener('pointerup',e=>{
+        if(!pointerActive) return;
+        if(e.pointerType==='mouse' && e.button!==0) return;
+        pointerActive=false;
+        suppressClick=true;
+        e.preventDefault();
+        activateNav(view);
+        setTimeout(()=>{ suppressClick=false; },0);
+      });
+      btn.addEventListener('click',e=>{
+        if(suppressClick) return;
+        activateNav(view);
+      });
+    });
 
     /* ===== История ===== */
     const HIST_KEY='calc.history', historyList=$('#historyList');
