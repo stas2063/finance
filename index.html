@@ -11,15 +11,32 @@
   <script>
     (function initThemeEarly(){
       const KEY='app.theme';
+      const FLAG='app.theme.explicit';
       const prefersDark=()=>window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      let theme='light';
+      const resolveModeTheme=mode=>mode==='dark' ? 'dark' : mode==='light' ? 'light' : (prefersDark() ? 'dark' : 'light');
+      let mode='system';
       try{
         const saved=localStorage.getItem(KEY);
-        theme = saved || (prefersDark() ? 'dark' : 'light');
+        const explicit=localStorage.getItem(FLAG)==='1';
+        if(saved==='system' || !saved){
+          mode='system';
+        }else if(saved==='dark' || saved==='light'){
+          if(explicit){
+            mode=saved;
+          }else if(saved==='dark'){
+            mode='dark';
+            localStorage.setItem(FLAG,'1');
+          }else{
+            mode='system';
+            localStorage.removeItem(KEY);
+          }
+        }
       }catch(err){
-        theme = prefersDark() ? 'dark' : 'light';
+        mode='system';
       }
+      const theme=resolveModeTheme(mode);
       document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('data-theme-mode', mode);
     })();
   </script>
   <style>
@@ -143,6 +160,7 @@
           <div class="field">
             <span class="label">Тема</span>
             <div id="themeToggle" class="theme-toggle" role="group" aria-label="Тема">
+              <button type="button" data-value="system">Системная</button>
               <button type="button" data-value="light">Светлая</button>
               <button type="button" data-value="dark">Тёмная</button>
             </div>
@@ -207,41 +225,96 @@
 
     /* ===== Тема ===== */
     const THEME_KEY='app.theme';
+    const THEME_EXPLICIT_KEY='app.theme.explicit';
     const themeToggle=$('#themeToggle');
     const mediaDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-    const systemThemeListener = e=>{
-      if(getStoredTheme()) return;
-      const next = e.matches ? 'dark' : 'light';
-      applyTheme(next);
-      setThemeUI(next);
-    };
-    function applyTheme(v){ document.documentElement.setAttribute('data-theme', v); }
-    function setThemeUI(v){ if(!themeToggle) return; themeToggle.querySelectorAll('button').forEach(btn=>{ btn.classList.toggle('active', btn.dataset.value===v); }); }
-    function getStoredTheme(){ try{ return localStorage.getItem(THEME_KEY); }catch(_){ return null; } }
-    function saveTheme(v){ try{ localStorage.setItem(THEME_KEY,v); }catch(_){ /* ignore */ } }
+    let themeMode=document.documentElement.getAttribute('data-theme-mode')||'system';
+
+    function resolveTheme(mode){
+      if(mode==='dark' || mode==='light') return mode;
+      return mediaDark && mediaDark.matches ? 'dark' : 'light';
+    }
+    function applyTheme(mode){
+      themeMode=mode;
+      document.documentElement.setAttribute('data-theme-mode', mode);
+      document.documentElement.setAttribute('data-theme', resolveTheme(mode));
+    }
+    function setThemeUI(mode){
+      if(!themeToggle) return;
+      themeToggle.querySelectorAll('button').forEach(btn=>{
+        btn.classList.toggle('active', btn.dataset.value===mode);
+      });
+    }
+    function getStoredTheme(){
+      try{ return localStorage.getItem(THEME_KEY); }
+      catch(_){ return null; }
+    }
+    function isThemeExplicit(){
+      try{ return localStorage.getItem(THEME_EXPLICIT_KEY)==='1'; }
+      catch(_){ return false; }
+    }
+    function saveTheme(mode){
+      try{
+        if(mode==='system'){
+          localStorage.setItem(THEME_KEY,'system');
+          localStorage.removeItem(THEME_EXPLICIT_KEY);
+        }else{
+          localStorage.setItem(THEME_KEY,mode);
+          localStorage.setItem(THEME_EXPLICIT_KEY,'1');
+        }
+      }catch(_){ /* ignore */ }
+    }
+    function clearThemePreference(){
+      try{
+        localStorage.removeItem(THEME_KEY);
+        localStorage.removeItem(THEME_EXPLICIT_KEY);
+      }catch(_){ /* ignore */ }
+    }
+    function determineInitialMode(){
+      const saved=getStoredTheme();
+      const explicit=isThemeExplicit();
+      if(saved==='system' || !saved) return 'system';
+      if(saved==='dark' || saved==='light'){
+        if(explicit){
+          return saved;
+        }
+        if(saved==='dark'){
+          saveTheme('dark');
+          return 'dark';
+        }
+        clearThemePreference();
+        return 'system';
+      }
+      return 'system';
+    }
     (function initTheme(){
-      const saved = getStoredTheme();
-      const attrTheme = document.documentElement.getAttribute('data-theme');
-      const initial = saved || attrTheme || (mediaDark && mediaDark.matches ? 'dark' : 'light');
-      applyTheme(initial);
-      setThemeUI(initial);
+      themeMode = document.documentElement.getAttribute('data-theme-mode') || determineInitialMode();
+      applyTheme(themeMode);
+      setThemeUI(themeMode);
       if(mediaDark){
-        if(mediaDark.addEventListener) mediaDark.addEventListener('change', systemThemeListener);
-        else if(mediaDark.addListener) mediaDark.addListener(systemThemeListener);
+        const handleSystemChange=e=>{
+          if(themeMode==='system'){
+            applyTheme('system');
+            setThemeUI('system');
+          }
+        };
+        if(mediaDark.addEventListener) mediaDark.addEventListener('change', handleSystemChange);
+        else if(mediaDark.addListener) mediaDark.addListener(handleSystemChange);
       }
       if(themeToggle){
-        themeToggle.addEventListener('click', (e)=>{
+        themeToggle.addEventListener('click', e=>{
           const btn=e.target.closest('button[data-value]');
           if(!btn) return;
-          const v=btn.dataset.value;
-          saveTheme(v);
-          applyTheme(v);
-          setThemeUI(v);
+          const mode=btn.dataset.value;
+          if(mode!=='light' && mode!=='dark' && mode!=='system') return;
+          saveTheme(mode);
+          applyTheme(mode);
+          setThemeUI(mode);
         });
       }
     })();
 
-      /* ===== Шторка (жесты) ===== */
+    /* ===== Шторка (жесты) ===== */
     const drawer=$('#drawer'), scrim=$('#scrim'), btnMenu=$('#btnMenu'), edge=$('#edge');
     let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300, moved=false;
     const measure=()=>{ w=drawer.getBoundingClientRect().width||280; };
