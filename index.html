@@ -1133,11 +1133,19 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
       return -1;
     }
 
+    // Склеиваем группы тысяч вида "1 590" в "1590", чтобы новые сегменты
+    // без пробелов не считались отличными и не дублировали число.
+    function normalizeDigitGroups(str){
+      return String(str).replace(/(^|[^\d])(\d{1,3}(?:\s\d{3})+)(?!\d)/g, (_,lead,num)=>lead+num.replace(/\s+/g,''));
+    }
+
     function mergeSegmentsNoDup(arr){
       let acc='';
       for(const raw of arr){
         let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
         if(!s) continue;
+        s = normalizeDigitGroups(s);
+        if(acc) acc = normalizeDigitGroups(acc);
         if(!acc){ acc=s; continue; }
 
         const accTokens = acc.split(' ').filter(Boolean);
