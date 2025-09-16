@@ -82,8 +82,10 @@
     .scrim{ position: fixed; inset: 0; background: rgba(0,0,0,.6); opacity: 0; pointer-events: none; transition: none; will-change: opacity; z-index: 1000; touch-action: none; }
     #edge{ position:fixed; inset:0 auto 0 0; width:24px; z-index:1002; touch-action:none; background:transparent; }
 
-    .navbtn{ appearance:none; display:block; width:100%; background:var(--primary); color:#fff; border:0; border-radius:22px; padding:18px 20px; margin:14px 0 0; text-align:left; font-weight:800; font-size:20px; box-shadow:0 10px 20px rgba(10,132,255,.25); cursor:pointer; user-select:none; }
+    .navbtn{ appearance:none; display:block; width:100%; background:var(--input-bg); color:var(--fg); border:1px solid var(--divider); border-radius:18px; padding:16px 20px; margin:14px 0 0; text-align:left; font-weight:700; font-size:18px; box-shadow:0 6px 18px rgba(0,0,0,0.12); cursor:pointer; user-select:none; transition:background-color .15s ease, color .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    [data-theme="dark"] .navbtn{ box-shadow:0 10px 24px rgba(0,0,0,0.32); }
     .navbtn:active{ transform:translateY(1px); }
+    .navbtn.active{ background:var(--primary); color:#fff; border-color:var(--primary); box-shadow:0 10px 24px rgba(10,132,255,0.32); }
 
     .about-body{ flex:1; display:flex; flex-direction:column; gap:16px; padding:0 16px; }
     .about-footer{ text-align:center; color:var(--muted); padding-top:6px; margin-bottom:calc(6px + var(--safe-bottom)); }
@@ -307,7 +309,14 @@
 
     /* ===== Навигация ===== */
     const views={calc:'#view-calc',settings:'#view-settings',about:'#view-about'};
-    const showView=k=>{ Object.values(views).forEach(sel=>document.querySelector(sel).classList.remove('active')); (document.querySelector(views[k])||document.querySelector(views.calc)).classList.add('active'); };
+    const setActiveNav=view=>{
+      $$('.navbtn').forEach(btn=>btn.classList.toggle('active', btn.dataset.view===view));
+    };
+    const showView=k=>{
+      Object.values(views).forEach(sel=>document.querySelector(sel).classList.remove('active'));
+      (document.querySelector(views[k])||document.querySelector(views.calc)).classList.add('active');
+      setActiveNav(k in views ? k : 'calc');
+    };
     const activateNav=view=>{ showView(view); closeDrawer(); };
     $$('.navbtn').forEach(btn=>{
       let pointerActive=false;
@@ -335,6 +344,7 @@
         activateNav(view);
       });
     });
+    setActiveNav('calc');
 
     /* ===== История ===== */
     const HIST_KEY='calc.history', historyList=$('#historyList');
