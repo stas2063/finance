@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#f0f2f5" />
+  <meta name="color-scheme" content="light dark" />
   <title>Голосовой калькулятор</title>
   <link rel="icon" type="image/png" href="img/icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -45,8 +46,12 @@
         mode='system';
       }
       const theme=resolveModeTheme(mode);
-      document.documentElement.setAttribute('data-theme', theme);
-      document.documentElement.setAttribute('data-theme-mode', mode);
+      const docEl=document.documentElement;
+      const surface=THEME_COLORS[theme]||THEME_COLORS.light;
+      docEl.setAttribute('data-theme', theme);
+      docEl.setAttribute('data-theme-mode', mode);
+      docEl.style.backgroundColor=surface;
+      docEl.style.colorScheme=theme==='dark'?'dark':'light';
       applyThemeColor(theme);
     })();
   </script>
@@ -55,6 +60,9 @@
       --safe-top: env(safe-area-inset-top); --safe-left: env(safe-area-inset-left); --safe-right: env(safe-area-inset-right); --safe-bottom: env(safe-area-inset-bottom); }
     [data-theme="dark"]{ --bg:#121212; --fg:#f5f5f7; --muted:#a0a0a0; --primary:#0a84ff; --card:#1e1e1e; --divider: rgba(255,255,255,0.1); --input-bg:#1b1f24; }
     *{ box-sizing:border-box; }
+    html{ background:var(--bg); }
+    html[data-theme="dark"]{ color-scheme:dark; }
+    html[data-theme="light"]{ color-scheme:light; }
     html,body{ height:100vh; min-height:100vh; overflow:hidden; overscroll-behavior:none; touch-action:pan-x pan-y; }
     @supports (height: 100dvh){ html,body{ height:100dvh; min-height:100dvh; } }
     body{ margin:0; background:var(--bg); color:var(--fg); font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
@@ -171,7 +179,6 @@
           <div class="field">
             <span class="label">Тема</span>
             <div id="themeToggle" class="theme-toggle" role="group" aria-label="Тема">
-              <button type="button" data-value="system">Системная</button>
               <button type="button" data-value="light">Светлая</button>
               <button type="button" data-value="dark">Тёмная</button>
             </div>
@@ -239,24 +246,74 @@
     const THEME_EXPLICIT_KEY='app.theme.explicit';
     const themeToggle=$('#themeToggle');
     const themeMeta=document.querySelector('meta[name="theme-color"]');
+    const docEl=document.documentElement;
+    const bodyEl=document.body||document.documentElement;
     const SYSTEM_SURFACES={
-      light:{ meta:'#f0f2f5', status:'#f0f2f5', statusStyle:'dark', nav:'#f0f2f5', navTheme:'light' },
-      dark:{ meta:'#121212', status:'#121212', statusStyle:'light', nav:'#121212', navTheme:'dark' }
+      light:{ fallback:'#f0f2f5', statusStyle:'dark', navTheme:'light' },
+      dark:{ fallback:'#121212', statusStyle:'light', navTheme:'dark' }
     };
     let deviceReady=false;
 
+    const clamp255=v=>Math.max(0,Math.min(255,Math.round(v)));
+    function normalizeHex(color){
+      if(!color) return null;
+      let c=String(color).trim();
+      if(/^#[0-9a-f]{3}$/i.test(c)){
+        c='#'+c.slice(1).split('').map(ch=>ch+ch).join('');
+      }else if(/^#[0-9a-f]{8}$/i.test(c)){
+        c='#'+c.slice(-6);
+      }else if(!/^#[0-9a-f]{6}$/i.test(c)){
+        const m=c.match(/^rgba?\(([^)]+)\)$/i);
+        if(m){
+          const parts=m[1].split(',').map(p=>parseFloat(p));
+          if(parts.length>=3 && parts.slice(0,3).every(n=>Number.isFinite(n))){
+            const [r,g,b]=parts;
+            c='#'+[clamp255(r),clamp255(g),clamp255(b)].map(v=>v.toString(16).padStart(2,'0')).join('');
+          }else{
+            return null;
+          }
+        }else{
+          return null;
+        }
+      }
+      return c.toLowerCase();
+    }
+
+    function readCSSColor(varName, fallback){
+      try{
+        const styles=getComputedStyle(docEl);
+        if(!styles) return fallback;
+        const value=styles.getPropertyValue(varName);
+        return value ? value.trim() || fallback : fallback;
+      }catch(_){
+        return fallback;
+      }
+    }
+
+    function applyColorScheme(theme){
+      const scheme=theme==='dark'?'dark':'light';
+      docEl.style.colorScheme=scheme;
+      bodyEl.style.colorScheme=scheme;
+    }
+
     function applySystemSurfaces(theme){
       const preset=SYSTEM_SURFACES[theme]||SYSTEM_SURFACES.light;
-      const metaColor=preset.meta;
+      const bgColor=readCSSColor('--bg', preset.fallback);
+      const metaColor=bgColor||preset.fallback;
       if(themeMeta && metaColor && themeMeta.getAttribute('content')!==metaColor){
         themeMeta.setAttribute('content', metaColor);
       }
+      if(metaColor){
+        docEl.style.backgroundColor=metaColor;
+        bodyEl.style.backgroundColor=metaColor;
+      }
+      applyColorScheme(theme);
       if(!deviceReady) return;
-      const statusColor=preset.status||metaColor;
+      const statusHex=normalizeHex(readCSSColor('--bg', preset.fallback))||normalizeHex(metaColor)||normalizeHex(preset.fallback);
       try{
         if(window.StatusBar){
-          if(typeof StatusBar.backgroundColorByHexString==='function' && statusColor){
-            StatusBar.backgroundColorByHexString(statusColor);
+          if(statusHex && typeof StatusBar.backgroundColorByHexString==='function'){
+            StatusBar.backgroundColorByHexString(statusHex);
           }
           if(preset.statusStyle==='light'){
             if(typeof StatusBar.styleLightContent==='function') StatusBar.styleLightContent();
@@ -267,19 +324,18 @@
       }catch(_){ /* ignore */ }
       try{
         if(window.NavigationBar){
-          const navColor=preset.nav||metaColor;
-          const hasColor=navColor && typeof navColor==='string';
+          const navHex=normalizeHex(readCSSColor('--bg', preset.fallback))||statusHex;
           const wantsLightBackground=preset.navTheme==='light';
-          if(hasColor){
+          if(navHex){
             if(typeof NavigationBar.backgroundColorByHexString==='function'){
               if(NavigationBar.backgroundColorByHexString.length>=2){
-                NavigationBar.backgroundColorByHexString(navColor, wantsLightBackground);
+                NavigationBar.backgroundColorByHexString(navHex, wantsLightBackground);
               }else{
-                NavigationBar.backgroundColorByHexString(navColor);
+                NavigationBar.backgroundColorByHexString(navHex);
               }
-            }else if(typeof NavigationBar.setNavigationBarColor==='function'){
-              const hex=navColor.replace('#','');
-              NavigationBar.setNavigationBarColor(hex, wantsLightBackground);
+            }
+            if(typeof NavigationBar.setNavigationBarColor==='function'){
+              NavigationBar.setNavigationBarColor(navHex.replace('#',''), wantsLightBackground);
             }
           }
           if(typeof NavigationBar.setNavigationBarMode==='function'){
@@ -298,14 +354,15 @@
     function applyTheme(mode){
       themeMode=mode;
       const theme=resolveTheme(mode);
-      document.documentElement.setAttribute('data-theme-mode', mode);
-      document.documentElement.setAttribute('data-theme', theme);
+      docEl.setAttribute('data-theme-mode', mode);
+      docEl.setAttribute('data-theme', theme);
       applySystemSurfaces(theme);
     }
     function setThemeUI(mode){
       if(!themeToggle) return;
+      const effective = mode==='system' ? resolveTheme('system') : mode;
       themeToggle.querySelectorAll('button').forEach(btn=>{
-        btn.classList.toggle('active', btn.dataset.value===mode);
+        btn.classList.toggle('active', btn.dataset.value===effective);
       });
     }
     function getStoredTheme(){
@@ -369,7 +426,13 @@
           const btn=e.target.closest('button[data-value]');
           if(!btn) return;
           const mode=btn.dataset.value;
-          if(mode!=='light' && mode!=='dark' && mode!=='system') return;
+          if(mode!=='light' && mode!=='dark') return;
+          if(btn.classList.contains('active') && themeMode===mode){
+            saveTheme('system');
+            applyTheme('system');
+            setThemeUI('system');
+            return;
+          }
           saveTheme(mode);
           applyTheme(mode);
           setThemeUI(mode);
