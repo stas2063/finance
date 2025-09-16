@@ -780,11 +780,11 @@ function stripIrrelevantTokens(str){
     .filter(tok=>{
       if(!tok) return false;
       if(['+','-','*','/','(',')'].includes(tok)) return true;
-      if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
+      if(/^[-+]?\d+(?:[.,]\d+)?%$/.test(tok)) return true;
       if(/^процент(?:а|ов)?$/i.test(tok)) return true;
       if(/^(?:pow|sqrt|cbrt|root)\(/i.test(tok)) return true;
       const low = tok.toLowerCase();
-      return /^\d+(?:[.,]\d+)?$/.test(tok) ||
+      return /^[-+]?\d+(?:[.,]\d+)?$/.test(tok) ||
              UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
              /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
              low==='млн' || low==='млрд';
