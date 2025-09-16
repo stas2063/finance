@@ -1081,6 +1081,19 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     }
 
     /* ===== Вспомогательная склейка сегментов без дублей ===== */
+    function findSubsequenceIndex(haystackTokens, needleTokens){
+      const h = haystackTokens.map(tok=>tok.toLowerCase());
+      const n = needleTokens.map(tok=>tok.toLowerCase());
+      if(!n.length || n.length>h.length) return n.length===0 ? 0 : -1;
+      outer: for(let i=0;i<=h.length-n.length;i++){
+        for(let j=0;j<n.length;j++){
+          if(h[i+j]!==n[j]) continue outer;
+        }
+        return i;
+      }
+      return -1;
+    }
+
     function mergeSegmentsNoDup(arr){
       let acc='';
       for(const raw of arr){
@@ -1088,8 +1101,8 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
         if(!s) continue;
         if(!acc){ acc=s; continue; }
 
-        const accTokens = acc.split(' ');
-        const sTokens = s.split(' ');
+        const accTokens = acc.split(' ').filter(Boolean);
+        const sTokens = s.split(' ').filter(Boolean);
         let merged=false;
 
         for(let k=Math.min(sTokens.length, accTokens.length); k>0; k--){
@@ -1104,6 +1117,21 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           }
         }
         if(merged) continue;
+
+        const idxContainedInAcc = findSubsequenceIndex(accTokens, sTokens);
+        if(idxContainedInAcc !== -1){
+          // Новый сегмент полностью содержится в уже накопленной строке —
+          // игнорируем его, чтобы не дублировать числовую часть.
+          continue;
+        }
+
+        const idxAccInsideNew = findSubsequenceIndex(sTokens, accTokens);
+        if(idxAccInsideNew !== -1){
+          // Новый сегмент включает предыдущий (например, добавился пропущенный кусок)
+          // — берём его целиком вместо старого.
+          acc = s;
+          continue;
+        }
 
         const tail = accTokens.slice(-8).join(' ').trim();
         if (tail && s.startsWith(tail)) acc = acc + s.slice(tail.length);
