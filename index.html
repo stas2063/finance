@@ -1176,15 +1176,56 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     }
 
     function mergeSegmentsNoDup(arr){
+      const normTok = tok => String(tok||'').toLowerCase().replace(/[.,!?;:]/g,'');
+      const tokensEqual = (a,b)=>{
+        if(a.length!==b.length) return false;
+        for(let i=0;i<a.length;i++){
+          if(normTok(a[i])!==normTok(b[i])) return false;
+        }
+        return true;
+      };
+      const isOperatorToken = tok => {
+        const n = normTok(tok);
+        return n==='+'||n==='-'||n==='*'||n==='/'||
+               n==='плюс'||n==='минус'||n==='умножь'||n==='умножить'||
+               n==='помножь'||n==='помножить'||n==='дели'||n==='раздели'||
+               n==='разделить'||n==='подели'||n==='на';
+      };
       let acc='';
       for(const raw of arr){
-        let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
-        if(!s) continue;
-        s = normalizeDigitGroups(s);
+        let sRaw=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
+        if(!sRaw) continue;
+        let sTokensRaw = sRaw.split(' ').filter(Boolean);
+        let s = normalizeDigitGroups(sRaw);
         if(acc) acc = normalizeDigitGroups(acc);
         if(!acc){ acc=s; continue; }
 
         const accTokens = acc.split(' ').filter(Boolean);
+
+        if(accTokens.length && sTokensRaw.length){
+          const occurrences=[];
+          for(let i=0;i<=sTokensRaw.length-accTokens.length;i++){
+            const rawChunk = sTokensRaw.slice(i, i+accTokens.length).join(' ');
+            const chunkTokens = normalizeDigitGroups(rawChunk).split(' ').filter(Boolean);
+            if(tokensEqual(chunkTokens, accTokens)) occurrences.push(i);
+          }
+          if(occurrences.length>1){
+            let changed=false;
+            for(let idx=occurrences.length-1; idx>=0; idx--){
+              const pos=occurrences[idx];
+              if(pos===occurrences[0]) continue;
+              const prevTok=sTokensRaw[pos-1];
+              if(prevTok && isOperatorToken(prevTok)) continue;
+              sTokensRaw.splice(pos, accTokens.length);
+              changed=true;
+            }
+            if(changed){
+              sRaw = sTokensRaw.join(' ');
+              s = normalizeDigitGroups(sRaw);
+            }
+          }
+        }
+
         let sTokens = s.split(' ').filter(Boolean);
 
         if(accTokens.length>=2 && sTokens.length){
@@ -1249,8 +1290,28 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
 
         const idxAccInsideNew = findSubsequenceIndex(sTokens, accTokens);
         if(idxAccInsideNew !== -1){
-          // Новый сегмент включает предыдущий (например, добавился пропущенный кусок)
-          // — берём его целиком вместо старого.
+          // Новый сегмент включает предыдущий. Оставляем его целиком, но сначала
+          // уберём подряд идущие повторы предыдущей фразы без операторов между ними,
+          // иначе получим "300 + 5 300 + 5".
+          const occurrences=[];
+          for(let i=0;i<=sTokens.length-accTokens.length;i++){
+            const chunk=sTokens.slice(i,i+accTokens.length);
+            if(tokensEqual(chunk, accTokens)) occurrences.push(i);
+          }
+          if(occurrences.length>1){
+            let changed=false;
+            for(let idxIdx=occurrences.length-1; idxIdx>=0; idxIdx--){
+              const pos=occurrences[idxIdx];
+              if(pos===idxAccInsideNew) continue;
+              const prevTok=sTokens[pos-1];
+              if(prevTok && isOperatorToken(prevTok)) continue;
+              sTokens.splice(pos, accTokens.length);
+              changed=true;
+            }
+            if(changed){
+              s=sTokens.join(' ');
+            }
+          }
           acc = s;
           continue;
         }
