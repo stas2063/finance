@@ -566,15 +566,64 @@
     $('#btnClearHistory').addEventListener('click',()=>{ saveHistory([]); renderHistory(); });
 
     /* ===== Нормализация/словари ===== */
+    const WORD_NORMALIZERS=[
+      {pattern:/^т[ьи]сяч[а-я]*$/, replacement:'тысяч'},
+      {pattern:/^тысяц[а-я]*$/, replacement:'тысяч'},
+      {pattern:/^тыщ[а-я]*$/, replacement:'тысяч'},
+      {pattern:/^тыс$/, replacement:'тысяч'},
+      {pattern:/^млн$/, replacement:'миллион'},
+      {pattern:/^млрд$/, replacement:'миллиард'},
+      {pattern:/^миль?и?он(?!н[а-я])([а-я]*)$/, replacement:match=>'миллион'+(match[1]||'')},
+      {pattern:/^мили?ард(?!н[а-я])([а-я]*)$/, replacement:match=>'миллиард'+(match[1]||'')},
+      {pattern:/^мильон([а-я]*)$/, replacement:match=>'миллион'+(match[1]||'')},
+      {pattern:/^мильярд([а-я]*)$/, replacement:match=>'миллиард'+(match[1]||'')},
+      {pattern:/^перв(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'один'},
+      {pattern:/^втор(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'два'},
+      {pattern:/^трет(?:ий|ья|ье|ью|ьей|ьим|ьих|ей)$/, replacement:'три'},
+      {pattern:/^треть(?:я|ей|ю|е)?$/, replacement:'три'},
+      {pattern:/^четверт(?:ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'четыре'},
+      {pattern:/^пят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'пять'},
+      {pattern:/^шест(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'шесть'},
+      {pattern:/^седьм(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'семь'},
+      {pattern:/^восьм(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'восемь'},
+      {pattern:/^девят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'девять'},
+      {pattern:/^десят(ой|ый|ая|ое|ую|ого|ому|ыми|ых|ым)$/, replacement:'дсять'},
+      {pattern:/^тридать$/, replacement:'тридцать'},
+      {pattern:/^шестьдесять$/, replacement:'шестьдесят'},
+      {pattern:/^семьдесять$/, replacement:'семьдесят'},
+      {pattern:/^восемьдесять$/, replacement:'восемьдесят'},
+      {pattern:/^шесдесят$/, replacement:'шестьдесят'},
+      {pattern:/^семдесят$/, replacement:'семьдесят'},
+      {pattern:/^восемдесят$/, replacement:'восемьдесят'},
+      {pattern:/^девяноста$/, replacement:'девяносто'},
+      {pattern:/^двесте$/, replacement:'двести'},
+      {pattern:/^двисти$/, replacement:'двести'},
+      {pattern:/^тристо$/, replacement:'триста'},
+      {pattern:/^четыр?иста$/, replacement:'четыреста'},
+      {pattern:/^пятсот$/, replacement:'пятьсот'},
+      {pattern:/^пяцот$/, replacement:'пятьсот'},
+      {pattern:/^шессот$/, replacement:'шестьсот'},
+      {pattern:/^шесот$/, replacement:'шестьсот'},
+      {pattern:/^семсот$/, replacement:'семьсот'},
+      {pattern:/^восемсот$/, replacement:'восемьсот'},
+      {pattern:/^девя[сз]от$/, replacement:'девятьсот'},
+      {pattern:/^дв(?:ух|ум|умя)(?:сот|ст)[а-я]*$/, replacement:'двести'},
+      {pattern:/^тр(?:ех|ёх|ем|ём|емя|ёмя)(?:сот|ст)[а-я]*$/, replacement:'триста'},
+      {pattern:/^чет(?:ырех|ырёх|ырем|ырём|ырьмя)(?:сот|ст)[а-я]*$/, replacement:'четыреста'},
+      {pattern:/^пят(?:и|ью)(?:сот|ст)[а-я]*$/, replacement:'пятьсот'},
+      {pattern:/^шест(?:и|ью)(?:сот|ст)[а-я]*$/, replacement:'шестьсот'},
+      {pattern:/^сем(?:и|ью)(?:сот|ст)[а-я]*$/, replacement:'семьсот'},
+      {pattern:/^(?:восьм|восем)(?:и|ью)(?:сот|ст)[а-я]*$/, replacement:'восемьсот'},
+      {pattern:/^девят(?:и|ью)(?:сот|ст)[а-я]*$/, replacement:'девятьсот'},
+    ];
     function normalizeNumeralTypos(s){
-      return String(s)
+      let out = String(s)
         .toLowerCase().replace(/ё/g,'е')
         .replace(/[\u00A0\u202F]/g,' ')
         // масштабы и разговорные
         .replace(/\bт[ьи]сяч[а-я]*\b/g,'тысяч')
         .replace(/\bтысяц[а-я]*\b/g,'тысяч')
-        .replace(/\bтыща\b/g,'тысяч')
-        .replace(/\bтыщ\b/g,'тысяч')
+        .replace(/\bтыщ[а-я]*\b/g,'тысяч')
         .replace(/\bтыс\.?\b/g,'тысяч')
         .replace(/\bмлн\.?\b/g,'миллион')
         .replace(/\bмлрд\.?\b/g,'миллиард')
@@ -629,6 +678,16 @@
         .replace(/\bдевя[сз]от\b/g,'девятьсот')
         // «минус17» → «минус 17»
         .replace(/\bминус(?=\d)/g,'минус ');
+      out = out.replace(/[а-я]+/g,word=>{
+        for(const {pattern,replacement} of WORD_NORMALIZERS){
+          const match=word.match(pattern);
+          if(!match) continue;
+          if(typeof replacement==='function') return replacement(match);
+          return replacement;
+        }
+        return word;
+      });
+      return out;
     }
     function foldCompoundHundreds(s){
       return s
