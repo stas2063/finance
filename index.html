@@ -1,21 +1,72 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#f0f2f5" />
+  <meta name="color-scheme" content="light dark" />
   <title>Голосовой калькулятор</title>
   <link rel="icon" type="image/png" href="img/icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+  <script>
+    (function initThemeEarly(){
+      const THEME_COLORS={light:'#f0f2f5', dark:'#121212'};
+      const themeMeta=document.querySelector('meta[name="theme-color"]');
+      const applyThemeColor=theme=>{
+        if(!themeMeta) return;
+        const color=THEME_COLORS[theme]||THEME_COLORS.light;
+        if(themeMeta.getAttribute('content')!==color){
+          themeMeta.setAttribute('content', color);
+        }
+      };
+      const KEY='app.theme';
+      const FLAG='app.theme.explicit';
+      const prefersDark=()=>window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const resolveModeTheme=mode=>mode==='dark' ? 'dark' : mode==='light' ? 'light' : (prefersDark() ? 'dark' : 'light');
+      let mode='system';
+      try{
+        const saved=localStorage.getItem(KEY);
+        const explicit=localStorage.getItem(FLAG)==='1';
+        if(saved==='system' || !saved){
+          mode='system';
+        }else if(saved==='dark' || saved==='light'){
+          if(explicit){
+            mode=saved;
+          }else if(saved==='dark'){
+            mode='dark';
+            localStorage.setItem(FLAG,'1');
+          }else{
+            mode='system';
+            localStorage.removeItem(KEY);
+          }
+        }
+      }catch(err){
+        mode='system';
+      }
+      const theme=resolveModeTheme(mode);
+      const docEl=document.documentElement;
+      const surface=THEME_COLORS[theme]||THEME_COLORS.light;
+      docEl.setAttribute('data-theme', theme);
+      docEl.setAttribute('data-theme-mode', mode);
+      docEl.style.backgroundColor=surface;
+      docEl.style.colorScheme=theme==='dark'?'dark':'light';
+      applyThemeColor(theme);
+    })();
+  </script>
   <style>
     :root{ --bg:#f0f2f5; --fg:#111; --muted:#666; --primary:#0a84ff; --card:#fff; --divider: rgba(0,0,0,.08); --input-bg:#fff;
       --safe-top: env(safe-area-inset-top); --safe-left: env(safe-area-inset-left); --safe-right: env(safe-area-inset-right); --safe-bottom: env(safe-area-inset-bottom); }
     [data-theme="dark"]{ --bg:#121212; --fg:#f5f5f7; --muted:#a0a0a0; --primary:#0a84ff; --card:#1e1e1e; --divider: rgba(255,255,255,0.1); --input-bg:#1b1f24; }
     *{ box-sizing:border-box; }
-    html,body{ height:100vh; min-height:100vh; overflow:hidden; overscroll-behavior:none; }
+    html{ background:var(--bg); }
+    html[data-theme="dark"]{ color-scheme:dark; }
+    html[data-theme="light"]{ color-scheme:light; }
+    html,body{ height:100vh; min-height:100vh; overflow:hidden; overscroll-behavior:none; touch-action:pan-x pan-y; }
     @supports (height: 100dvh){ html,body{ height:100dvh; min-height:100dvh; } }
-    body{ margin:0; background:var(--bg); color:var(--fg); font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+    body{ margin:0; background:var(--bg); color:var(--fg); font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; -webkit-user-select:none; user-select:none; }
+    input, textarea{ -webkit-user-select:text; user-select:text; }
 
     button, select { -webkit-tap-highlight-color: transparent; }
     .btn:focus, .navbtn:focus, .hamb:focus, select:focus { outline: none; }
@@ -23,12 +74,12 @@
     .screen{ position:relative; background:var(--card); height:100%; width:100%; overflow:hidden;
       padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 16px) calc(var(--safe-bottom) + 20px) calc(var(--safe-left) + 16px);
       display:flex; align-items:stretch; justify-content:center; }
-    .wrap{ width:min(640px, 96vw); height:100%; overflow:hidden; display:flex; flex-direction:column; gap:0; padding-top:12px; }
+    .wrap{ width:min(640px, 96vw); height:100%; overflow:hidden; display:flex; flex-direction:column; gap:0; padding-top:0; }
     .view{ display:none; flex-direction:column; min-height:calc(100dvh - 64px - var(--safe-top) - var(--safe-bottom)); }
     .view.active{ display:flex; }
 
-    .header{ text-align:center; padding: 8px 16px 0 16px; position:relative; }
-    h1{ margin:12px 0 8px; font-size:28px; font-weight:800; }
+    .header{ text-align:center; padding: 0 16px; position:relative; }
+    h1{ margin:0 0 8px; font-size:28px; font-weight:800; }
     #status{ color:var(--muted); min-height:24px; margin:0 0 12px; display:flex; align-items:center; justify-content:center; text-align:center; }
 
     /* Строка выражения — при переполнении уезжает влево, можно скроллить */
@@ -45,26 +96,33 @@
     .btn.circle{ width:160px; height:160px; border-radius:9999px; }
     .btn .title{ font-weight:800; font-size:16px; letter-spacing:.4px; }
 
-    .history-block{ background:var(--card); border-radius:16px; padding:16px; width:min(560px,92%); margin:8px auto calc(32px + var(--safe-bottom)); display:flex; flex-direction:column; gap:16px; max-height:clamp(260px,44vh,460px); }
+    .history-block{ background:var(--card); border-radius:16px; padding:20px 20px 16px; width:min(360px,calc(100% - 32px)); margin:12px auto calc(36px + var(--safe-bottom)); display:flex; flex-direction:column; gap:16px; max-height:clamp(300px,48vh,440px); overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,0.28); }
+    [data-theme="light"] .history-block{ box-shadow:0 22px 44px rgba(15,24,44,0.12); }
     .history-title{ margin:0; font-size:18px; font-weight:600; text-align:center; color:var(--fg); }
-    .history-list{ list-style:none; margin:0; padding:0; flex:1; overflow:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+    .history-list{ list-style:none; margin:0; padding:4px 2px 4px 0; flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
     .history-list::-webkit-scrollbar{ display:none; }
-    .history-list li{ padding:12px 0; border-bottom:1px solid var(--divider); }
+    .history-list li{ padding:14px 0; border-bottom:1px solid var(--divider); display:flex; flex-direction:column; gap:4px; }
     .history-list li:last-child{ border-bottom:0; }
-    .history-list .expr{ font-size:16px; color:var(--fg); }
-    .history-list .time{ font-size:14px; color:var(--muted); margin-top:2px; }
-    .history-list li.empty{ color:var(--muted); font-size:14px; text-align:center; }
-    .history-clear{ width:100%; background:#0a84ff; color:#fff; border:0; border-radius:10px; padding:12px 0; font-size:16px; font-weight:600; cursor:pointer; }
+    .history-list .expr{ font-size:16px; font-weight:600; color:var(--fg); line-height:1.35; }
+    .history-list .time{ font-size:14px; color:var(--muted); }
+    [data-theme="light"] .history-title,
+    [data-theme="light"] .history-list .expr,
+    [data-theme="light"] .history-list .time{ color:#000; }
+    [data-theme="light"] .history-list .time{ color:#5c5c5c; }
+    .history-list li.empty{ color:var(--muted); font-size:14px; text-align:center; padding:24px 0; }
+    .history-clear{ width:100%; background:#0a84ff; color:#fff; border:0; border-radius:10px; padding:14px 0; font-size:16px; font-weight:600; cursor:pointer; flex-shrink:0; box-shadow:0 10px 24px rgba(10,132,255,0.35); transition:transform .08s ease; }
     .history-clear:active{ transform:scale(.98); }
 
-    .hamb{ position:fixed; top:calc(var(--safe-top) + 36px); left:calc(var(--safe-left) + 14px); width:48px; height:48px; border:0; border-radius:14px; background:var(--primary); color:#fff; font-size:24px; font-weight:800; display:grid; place-items:center; box-shadow:0 6px 16px rgba(10,132,255,.35); cursor:pointer; z-index:1100; }
+    .hamb{ position:fixed; top:calc(var(--safe-top) + 10px); left:calc(var(--safe-left) + 14px); width:48px; height:48px; border:0; border-radius:14px; background:var(--primary); color:#fff; font-size:24px; font-weight:800; display:grid; place-items:center; box-shadow:0 6px 16px rgba(10,132,255,.35); cursor:pointer; z-index:1100; }
 
     .drawer{ position: fixed; inset: 0 auto 0 0; width: min(300px, 90vw); background: var(--card); color: var(--fg); box-shadow: 0 10px 30px rgba(0,0,0,.2); transform: translateX(-100%); transition: none; will-change: transform; z-index: 1001; padding: 136px 18px 18px; overflow: auto; touch-action: none; }
     .scrim{ position: fixed; inset: 0; background: rgba(0,0,0,.6); opacity: 0; pointer-events: none; transition: none; will-change: opacity; z-index: 1000; touch-action: none; }
     #edge{ position:fixed; inset:0 auto 0 0; width:24px; z-index:1002; touch-action:none; background:transparent; }
 
-    .navbtn{ appearance:none; display:block; width:100%; background:var(--primary); color:#fff; border:0; border-radius:22px; padding:18px 20px; margin:14px 0 0; text-align:left; font-weight:800; font-size:20px; box-shadow:0 10px 20px rgba(10,132,255,.25); cursor:pointer; user-select:none; }
+    .navbtn{ appearance:none; display:block; width:100%; background:var(--input-bg); color:var(--fg); border:1px solid var(--divider); border-radius:18px; padding:16px 20px; margin:14px 0 0; text-align:left; font-weight:700; font-size:18px; box-shadow:0 6px 18px rgba(0,0,0,0.12); cursor:pointer; user-select:none; transition:background-color .15s ease, color .15s ease, box-shadow .15s ease, border-color .15s ease; }
+    [data-theme="dark"] .navbtn{ box-shadow:0 10px 24px rgba(0,0,0,0.32); }
     .navbtn:active{ transform:translateY(1px); }
+    .navbtn.active{ background:var(--primary); color:#fff; border-color:var(--primary); box-shadow:0 10px 24px rgba(10,132,255,0.32); }
 
     .about-body{ flex:1; display:flex; flex-direction:column; gap:16px; padding:0 16px; }
     .about-footer{ text-align:center; color:var(--muted); padding-top:6px; margin-bottom:calc(6px + var(--safe-bottom)); }
@@ -134,7 +192,7 @@
         <div class="about-body">
           <article class="policy">
             <h2>Политика конфиденциальности приложения «Голосовой калькулятор»</h2>
-            <p><b>Дата последнего обновления:</b> 12 сентября 2025 г.</p>
+            <p><b>Дата последнего обновления:</b> 17 сентября 2025 г.</p>
             <h3>1. Общие положения</h3>
             <p>Мобильное приложение «Голосовой калькулятор» предназначено для голосовых вычислений. Используя Приложение, пользователь соглашается с условиями настоящей Политики.</p>
             <h3>2. Сбор и использование данных</h3>
@@ -161,7 +219,7 @@
             <h3>9. Контакты</h3>
             <p>Почта разработчика: <b>gameloft235@gmail.com</b>.</p>
           </article>
-          <div class="about-footer">Версия <b>1.0.0</b></div>
+          <div class="about-footer">Версия <b>1.0.7</b></div>
         </div>
       </section>
     </div>
@@ -173,21 +231,224 @@
     const $  = s=>document.querySelector(s);
     const $$ = s=>Array.from(document.querySelectorAll(s));
 
-    /* ===== Тема ===== */
-    const THEME_KEY='app.theme';
-    const themeToggle=$('#themeToggle');
-    function applyTheme(v){ document.documentElement.setAttribute('data-theme', v); }
-    function setThemeUI(v){ if(!themeToggle) return; themeToggle.querySelectorAll('button').forEach(btn=>{ btn.classList.toggle('active', btn.dataset.value===v); }); }
-    (function initTheme(){
-      const saved = localStorage.getItem(THEME_KEY);
-      const initial = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      applyTheme(initial); setThemeUI(initial);
-      if(themeToggle){ themeToggle.addEventListener('click', (e)=>{ const btn=e.target.closest('button[data-value]'); if(!btn) return; const v=btn.dataset.value; localStorage.setItem(THEME_KEY,v); applyTheme(v); setThemeUI(v); }); }
+    /* ===== Блокируем масштабирование жестами ===== */
+    (function preventPinchZoom(){
+      const stop = e => e.preventDefault();
+      document.addEventListener('gesturestart', stop, {passive:false});
+      document.addEventListener('gesturechange', stop, {passive:false});
+      document.addEventListener('gestureend', stop, {passive:false});
+      document.addEventListener('touchstart', e=>{ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+      document.addEventListener('touchmove', e=>{ if(e.touches.length>1) e.preventDefault(); }, {passive:false});
+      window.addEventListener('wheel', e=>{ if(e.ctrlKey) e.preventDefault(); }, {passive:false});
     })();
 
-      /* ===== Шторка (жесты) ===== */
+    /* ===== Тема ===== */
+    const THEME_KEY='app.theme';
+    const THEME_EXPLICIT_KEY='app.theme.explicit';
+    const themeToggle=$('#themeToggle');
+    const themeMeta=document.querySelector('meta[name="theme-color"]');
+    const docEl=document.documentElement;
+    const bodyEl=document.body||document.documentElement;
+    const SYSTEM_SURFACES={
+      light:{ fallback:'#f0f2f5', statusStyle:'dark', navTheme:'light' },
+      dark:{ fallback:'#121212', statusStyle:'light', navTheme:'dark' }
+    };
+    let deviceReady=false;
+
+    const clamp255=v=>Math.max(0,Math.min(255,Math.round(v)));
+    function normalizeHex(color){
+      if(!color) return null;
+      let c=String(color).trim();
+      if(/^#[0-9a-f]{3}$/i.test(c)){
+        c='#'+c.slice(1).split('').map(ch=>ch+ch).join('');
+      }else if(/^#[0-9a-f]{8}$/i.test(c)){
+        c='#'+c.slice(-6);
+      }else if(!/^#[0-9a-f]{6}$/i.test(c)){
+        const m=c.match(/^rgba?\(([^)]+)\)$/i);
+        if(m){
+          const parts=m[1].split(',').map(p=>parseFloat(p));
+          if(parts.length>=3 && parts.slice(0,3).every(n=>Number.isFinite(n))){
+            const [r,g,b]=parts;
+            c='#'+[clamp255(r),clamp255(g),clamp255(b)].map(v=>v.toString(16).padStart(2,'0')).join('');
+          }else{
+            return null;
+          }
+        }else{
+          return null;
+        }
+      }
+      return c.toLowerCase();
+    }
+
+    function readCSSColor(varName, fallback){
+      try{
+        const styles=getComputedStyle(docEl);
+        if(!styles) return fallback;
+        const value=styles.getPropertyValue(varName);
+        return value ? value.trim() || fallback : fallback;
+      }catch(_){
+        return fallback;
+      }
+    }
+
+    function applyColorScheme(theme){
+      const scheme=theme==='dark'?'dark':'light';
+      docEl.style.colorScheme=scheme;
+      bodyEl.style.colorScheme=scheme;
+    }
+
+    function applySystemSurfaces(theme){
+      const preset=SYSTEM_SURFACES[theme]||SYSTEM_SURFACES.light;
+      const bgColor=readCSSColor('--bg', preset.fallback);
+      const metaColor=bgColor||preset.fallback;
+      if(themeMeta && metaColor && themeMeta.getAttribute('content')!==metaColor){
+        themeMeta.setAttribute('content', metaColor);
+      }
+      if(metaColor){
+        docEl.style.backgroundColor=metaColor;
+        bodyEl.style.backgroundColor=metaColor;
+      }
+      applyColorScheme(theme);
+      if(!deviceReady) return;
+      const statusHex=normalizeHex(readCSSColor('--bg', preset.fallback))||normalizeHex(metaColor)||normalizeHex(preset.fallback);
+      try{
+        if(window.StatusBar){
+          if(statusHex && typeof StatusBar.backgroundColorByHexString==='function'){
+            StatusBar.backgroundColorByHexString(statusHex);
+          }
+          if(preset.statusStyle==='light'){
+            if(typeof StatusBar.styleLightContent==='function') StatusBar.styleLightContent();
+          }else if(typeof StatusBar.styleDefault==='function'){
+            StatusBar.styleDefault();
+          }
+        }
+      }catch(_){ /* ignore */ }
+      try{
+        if(window.NavigationBar){
+          const navHex=normalizeHex(readCSSColor('--bg', preset.fallback))||statusHex;
+          const wantsLightBackground=preset.navTheme==='light';
+          if(navHex){
+            if(typeof NavigationBar.backgroundColorByHexString==='function'){
+              if(NavigationBar.backgroundColorByHexString.length>=2){
+                NavigationBar.backgroundColorByHexString(navHex, wantsLightBackground);
+              }else{
+                NavigationBar.backgroundColorByHexString(navHex);
+              }
+            }
+            if(typeof NavigationBar.setNavigationBarColor==='function'){
+              NavigationBar.setNavigationBarColor(navHex.replace('#',''), wantsLightBackground);
+            }
+          }
+          if(typeof NavigationBar.setNavigationBarMode==='function'){
+            NavigationBar.setNavigationBarMode(wantsLightBackground ? 'light' : 'dark');
+          }
+        }
+      }catch(_){ /* ignore */ }
+    }
+    const mediaDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    let themeMode=document.documentElement.getAttribute('data-theme-mode')||'system';
+
+    function resolveTheme(mode){
+      if(mode==='dark' || mode==='light') return mode;
+      return mediaDark && mediaDark.matches ? 'dark' : 'light';
+    }
+    function applyTheme(mode){
+      themeMode=mode;
+      const theme=resolveTheme(mode);
+      docEl.setAttribute('data-theme-mode', mode);
+      docEl.setAttribute('data-theme', theme);
+      applySystemSurfaces(theme);
+    }
+    function setThemeUI(mode){
+      if(!themeToggle) return;
+      const effective = mode==='system' ? resolveTheme('system') : mode;
+      themeToggle.querySelectorAll('button').forEach(btn=>{
+        btn.classList.toggle('active', btn.dataset.value===effective);
+      });
+    }
+    function getStoredTheme(){
+      try{ return localStorage.getItem(THEME_KEY); }
+      catch(_){ return null; }
+    }
+    function isThemeExplicit(){
+      try{ return localStorage.getItem(THEME_EXPLICIT_KEY)==='1'; }
+      catch(_){ return false; }
+    }
+    function saveTheme(mode){
+      try{
+        if(mode==='system'){
+          localStorage.setItem(THEME_KEY,'system');
+          localStorage.removeItem(THEME_EXPLICIT_KEY);
+        }else{
+          localStorage.setItem(THEME_KEY,mode);
+          localStorage.setItem(THEME_EXPLICIT_KEY,'1');
+        }
+      }catch(_){ /* ignore */ }
+    }
+    function clearThemePreference(){
+      try{
+        localStorage.removeItem(THEME_KEY);
+        localStorage.removeItem(THEME_EXPLICIT_KEY);
+      }catch(_){ /* ignore */ }
+    }
+    function determineInitialMode(){
+      const saved=getStoredTheme();
+      const explicit=isThemeExplicit();
+      if(saved==='system' || !saved) return 'system';
+      if(saved==='dark' || saved==='light'){
+        if(explicit){
+          return saved;
+        }
+        if(saved==='dark'){
+          saveTheme('dark');
+          return 'dark';
+        }
+        clearThemePreference();
+        return 'system';
+      }
+      return 'system';
+    }
+    (function initTheme(){
+      themeMode = document.documentElement.getAttribute('data-theme-mode') || determineInitialMode();
+      applyTheme(themeMode);
+      setThemeUI(themeMode);
+      if(mediaDark){
+        const handleSystemChange=e=>{
+          if(themeMode==='system'){
+            applyTheme('system');
+            setThemeUI('system');
+          }
+        };
+        if(mediaDark.addEventListener) mediaDark.addEventListener('change', handleSystemChange);
+        else if(mediaDark.addListener) mediaDark.addListener(handleSystemChange);
+      }
+      if(themeToggle){
+        themeToggle.addEventListener('click', e=>{
+          const btn=e.target.closest('button[data-value]');
+          if(!btn) return;
+          const mode=btn.dataset.value;
+          if(mode!=='light' && mode!=='dark') return;
+          if(themeMode===mode) return;
+          saveTheme(mode);
+          applyTheme(mode);
+          setThemeUI(mode);
+        });
+      }
+    })();
+
+    document.addEventListener('deviceready', ()=>{
+      deviceReady=true;
+      try{
+        if(window.StatusBar && typeof StatusBar.overlaysWebView==='function'){
+          StatusBar.overlaysWebView(false);
+        }
+      }catch(_){ /* ignore */ }
+      applySystemSurfaces(resolveTheme(themeMode));
+    });
+
+    /* ===== Шторка (жесты) ===== */
     const drawer=$('#drawer'), scrim=$('#scrim'), btnMenu=$('#btnMenu'), edge=$('#edge');
-    let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300;
+    let isOpen=false, dragging=false, modeDrag='', startX=0, lastX=0, lastT=0, vX=0, w=0, pos=-300, moved=false;
     const measure=()=>{ w=drawer.getBoundingClientRect().width||280; };
     const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
     const setPos=px=>{ pos=clamp(px,-w,0); drawer.style.transform=`translateX(${pos}px)`; const k=1+pos/w; scrim.style.opacity=(0.6*k).toFixed(3); scrim.style.pointerEvents=k>0.02?'auto':'none'; };
@@ -198,16 +459,35 @@
     const toggleDrawer=()=> isOpen?closeDrawer():openDrawer();
     btnMenu.addEventListener('click',e=>{ e.preventDefault(); toggleDrawer(); });
     scrim.addEventListener('click', closeDrawer);
-    function swallowClick(){
-      const h=e=>{ e.stopPropagation(); e.preventDefault(); window.removeEventListener('click',h,true); };
-      window.addEventListener('click',h,true);
+    let swallowTimer=0;
+    let swallowCleanup=null;
+    function swallowClick(allowSelector){
+      if(swallowCleanup){ swallowCleanup(); }
+      const handler=e=>{
+        if(allowSelector && e.target.closest(allowSelector)){
+          cleanup();
+          return;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+        cleanup();
+      };
+      const cleanup=()=>{
+        window.removeEventListener('click',handler,true);
+        if(swallowTimer){ clearTimeout(swallowTimer); swallowTimer=0; }
+        swallowCleanup=null;
+      };
+      swallowCleanup=cleanup;
+      window.addEventListener('click',handler,true);
+      swallowTimer=setTimeout(cleanup,300);
     }
-    function beginOpen(x){ measure(); dragging=true; modeDrag='open';  startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(-w); }
-    function beginClose(x){ measure(); dragging=true; modeDrag='close'; startX=lastX=x; lastT=performance.now(); vX=0; stopTr(); setPos(0); }
-    function moveTo(x){ const dx=x-startX; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
+    function beginOpen(x){ measure(); dragging=true; modeDrag='open';  startX=lastX=x; lastT=performance.now(); vX=0; moved=false; stopTr(); setPos(-w); }
+    function beginClose(x){ measure(); dragging=true; modeDrag='close'; startX=lastX=x; lastT=performance.now(); vX=0; moved=false; stopTr(); setPos(0); }
+    function moveTo(x){ const dx=x-startX; if(!moved && Math.abs(dx)>6) moved=true; if(modeDrag==='open') setPos(-w+dx); else setPos(0+dx); const now=performance.now(), dt=now-lastT; if(dt>0){ vX=(x-lastX)/dt; lastX=x; lastT=now; } }
     function endDrag(e){
       if(!dragging) return;
-      swallowClick();
+      const allowSelector = modeDrag==='open' ? '.navbtn' : null;
+      if(moved) swallowClick(allowSelector);
       e.currentTarget.releasePointerCapture?.(e.pointerId);
       dragging=false;
       const opened=1+pos/w;
@@ -234,8 +514,42 @@
 
     /* ===== Навигация ===== */
     const views={calc:'#view-calc',settings:'#view-settings',about:'#view-about'};
-    const showView=k=>{ Object.values(views).forEach(sel=>document.querySelector(sel).classList.remove('active')); (document.querySelector(views[k])||document.querySelector(views.calc)).classList.add('active'); };
-    $$('.navbtn').forEach(b=> b.addEventListener('click',()=>{ showView(b.dataset.view); closeDrawer(); }));
+    const setActiveNav=view=>{
+      $$('.navbtn').forEach(btn=>btn.classList.toggle('active', btn.dataset.view===view));
+    };
+    const showView=k=>{
+      Object.values(views).forEach(sel=>document.querySelector(sel).classList.remove('active'));
+      (document.querySelector(views[k])||document.querySelector(views.calc)).classList.add('active');
+      setActiveNav(k in views ? k : 'calc');
+    };
+    const activateNav=view=>{ showView(view); closeDrawer(); };
+    $$('.navbtn').forEach(btn=>{
+      let pointerActive=false;
+      let suppressClick=false;
+      const view=btn.dataset.view;
+      btn.addEventListener('pointerdown',e=>{
+        if(e.pointerType==='mouse' && e.button!==0) return;
+        pointerActive=true;
+        if(typeof swallowCleanup==='function') swallowCleanup();
+      });
+      const resetPointer=()=>{ pointerActive=false; };
+      btn.addEventListener('pointerleave', resetPointer);
+      btn.addEventListener('pointercancel', resetPointer);
+      btn.addEventListener('pointerup',e=>{
+        if(!pointerActive) return;
+        if(e.pointerType==='mouse' && e.button!==0) return;
+        pointerActive=false;
+        suppressClick=true;
+        e.preventDefault();
+        activateNav(view);
+        setTimeout(()=>{ suppressClick=false; },0);
+      });
+      btn.addEventListener('click',e=>{
+        if(suppressClick) return;
+        activateNav(view);
+      });
+    });
+    setActiveNav('calc');
 
     /* ===== История ===== */
     const HIST_KEY='calc.history', historyList=$('#historyList');
@@ -645,96 +959,23 @@ function insertStarAfterPercent(str){
   const reg = new RegExp('(процент(?:а|ов)?|%)\\s+(?=(?:\\d+(?:[.,]\\d+)?|'+unit+')(?:\\s|$))','gi');
   return str.replace(reg,'$1 * ');
 }
-
-// Если перед sqrt/cbrt/root идёт число или словесное числительное без знака,
-// вставляем "*" для корректного умножения: "5 корень из 5" → "5 * sqrt(5)".
-function insertStarBeforeRoots(str){
-  const num = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
-  const re = new RegExp('(^|[+\\-*/(])\\s*(' + num + ')\\s+(?=(?:sqrt|cbrt|root)\\()', 'gi');
-  return str.replace(re, (m, lead, n) => lead + n + ' * ');
+function stripFractionPhrases(str){
+  const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
+  const DEN = '(?:половин[а-я]*|втор(?:ая|ой|ую|ых|их)|трет(?:ья|ью|ей|и|их|ь(?:я|ью|ей|и|их)?)|четверт(?:ь|и|ую|ых|ой)|пят(?:ая|ую|ых|и)|шест(?:ая|ую|ых|и)|седьм(?:ая|ую|ых|и)|восьм(?:ая|ую|ых|и)|девят(?:ая|ую|ых|и)|десят(?:ая|ую|ых|и))';
+  const re = new RegExp(`(^|\\s)${NUM}\\s+${DEN}(?=\\s|$|[.,!?;:])`, 'gi');
+  return str.replace(re, (match, lead) => lead || ' ');
 }
 
-// "два в квадрате", "пять в степени четыре", "квадратный корень из 81", "кубический корень из 8",
-// "корень третьей степени из 27" → соответствующие pow()/sqrt()/cbrt()/root()
-function normalizePowersAndRoots(str){
+function stripRootsAndPowers(str){
+  const TERM = '(?:[а-яё0-9.,]+(?:\\s+[а-яё0-9.,]+)*)';
   let s = String(str);
-  const ord = w=>{
-    w=w.toLowerCase().trim();
-    const map={
-      'перв':1,'втор':2,'треть':3,'трет':3,'четвер':4,'четвёр':4,
-      'пят':5,'шест':6,'седь':7,'восьм':8,'девят':9,'десят':10
-    };
-    for(const k in map){ if(w.startsWith(k)) return String(map[k]); }
-    return w;
-  };
-  // степени
-  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+квадрате/gi, (_,a)=>`pow(${a},2)`);
-  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+кубе/gi, (_,a)=>`pow(${a},3)`);
-  s = s.replace(/([\d.,]+|[а-яё]+)\s+в\s+степени\s+([\d.,а-яё]+)/gi, (_,a,b)=>`pow(${a},${ord(b)})`);
-  // корни
-  s = s.replace(/квадратн[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
-  s = s.replace(/корень\s+квадратн[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
-  s = s.replace(/кубическ[а-я]*\s+корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
-  s = s.replace(/корень\s+кубическ[а-я]*\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`cbrt(${x})`);
-  s = s.replace(/корень\s+([\d.,а-яё]+)\s+степени\s+из\s+([\d.,а-яё]+)/gi, (_,deg,x)=>`root(${x},${ord(deg)})`);
-  s = s.replace(/корень\s+из\s+([\d.,а-яё]+)/gi, (_,x)=>`sqrt(${x})`);
+  const rootPattern = new RegExp(`(?:квадратн[а-я]*\\s+корень|кубическ[а-я]*\\s+корень|корень(?:\\s+[а-яё]+)*)\\s+из\\s+${TERM}`, 'gi');
+  s = s.replace(rootPattern, ' ');
+  const powerPattern = new RegExp(`${TERM}\\s+в\\s+(?:квадрате|кубе|степени\\s+${TERM})`, 'gi');
+  s = s.replace(powerPattern, ' ');
   return s;
 }
 
-// "две трети" → "2/3", "семь пятых" → "7/5"
-function normalizeFractions(str){
-  const NUM = '(?:\\d+(?:[.,]\\d+)?|[а-яё]+(?:\\s+[а-яё]+)*)';
-  const DEN = '('
-    + 'половин[а-я]*|'
-    + 'втор(?:ая|ой|ую|ых|их)|'
-    + 'трет(?:ья|ью|ей|и|их)|'
-    + 'четверт(?:ь|и|ую|ых|ой)|'
-    + 'пят(?:ая|ую|ых|и)|'
-    + 'шест(?:ая|ую|ых|и)|'
-    + 'седьм(?:ая|ую|ых|и)|'
-    + 'восьм(?:ая|ую|ых|и)|'
-    + 'девят(?:ая|ую|ых|и)|'
-    + 'десят(?:ая|ую|ых|и)'
-    + ')';
-
-  // 1) Строгое совпадение с формами "пятых", "четвертых" и т.п.
-  const reWords = new RegExp(`(^|\\s)(${NUM})\\s+${DEN}(?=\\s|$|[.,!?;:])`, 'gi');
-  str = str.replace(reWords, (m, lead, numStr, denStr) => {
-    const num = extractNumberRu(numStr);
-    const d = denStr.toLowerCase();
-    let den = 0;
-    if(/^пол|^втор/.test(d)) den = 2;
-    else if(/^трет/.test(d)) den = 3;
-    else if(/^четверт/.test(d)) den = 4;
-    else if(/^пят/.test(d)) den = 5;
-    else if(/^шест/.test(d)) den = 6;
-    else if(/^седьм/.test(d)) den = 7;
-    else if(/^восьм/.test(d)) den = 8;
-    else if(/^девят/.test(d)) den = 9;
-    else if(/^десят/.test(d)) den = 10;
-    if(!isNaN(Number(num)) && den){
-      return `${lead}${num} / ${den}`;
-    }
-    return m;
-  });
-
-  // 2) Иногда ASR теряет окончание и отдаёт просто "семь пять" → трактуем как 7/5,
-  //    если обе части — числа <=10 и числитель не слишком большой.
-  const CARD = '(?:\\d+|ноль|один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)';
-  const reCard = new RegExp(`(^|\\s)(${NUM})\\s+(${CARD})(?=\\s|$|[.,!?;:])`, 'gi');
-  str = str.replace(reCard, (m, lead, numStr, denStr, offset, s) => {
-    const prev = s[offset-1];
-    if(prev==='*' || prev==='/') return m;
-    const num = Number(extractNumberRu(numStr));
-    const den = Number(extractNumberRu(denStr));
-    if(!isNaN(num) && !isNaN(den) && num < 100 && den >= 2 && den <= 10){
-      return `${lead}${num} / ${den}`;
-    }
-    return m;
-  });
-
-  return str;
-}
 
 // Удаляем токены, не относящиеся к числам или операциям
 function stripIrrelevantTokens(str){
@@ -745,11 +986,10 @@ function stripIrrelevantTokens(str){
     .filter(tok=>{
       if(!tok) return false;
       if(['+','-','*','/','(',')'].includes(tok)) return true;
-      if(/^\d+(?:[.,]\d+)?%$/.test(tok)) return true;
+      if(/^[-+]?\d+(?:[.,]\d+)?%$/.test(tok)) return true;
       if(/^процент(?:а|ов)?$/i.test(tok)) return true;
-      if(/^(?:pow|sqrt|cbrt|root)\(/i.test(tok)) return true;
       const low = tok.toLowerCase();
-      return /^\d+(?:[.,]\d+)?$/.test(tok) ||
+      return /^[-+]?\d+(?:[.,]\d+)?$/.test(tok) ||
              UNITS[low] !== undefined || TENS[low] !== undefined || HUNS[low] !== undefined ||
              /^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) ||
              low==='млн' || low==='млрд';
@@ -768,13 +1008,8 @@ function parseExpression(textRaw){
     .replace(/(посчитай|посчитать|сколько будет|сколько|сосчитай|итого|в итоге|равно)/g,' ')
     .trim();
 
-  // защитим «1/2»
-  t = t.replace(/\b1\s*\/\s*2\b/g,' §half§ ').replace(/½/g,' §half§ ');
-
-  // Базовая нормализация и явные операции
+    // Базовая нормализация и явные операции
   t = normalizeNumeralTypos(t);
-  t = normalizePowersAndRoots(t);
-  t = insertStarBeforeRoots(t);
   t = t
     .replace(/(умнож[а-я]*?)\s+на/g,' * ')
     .replace(/(помнож[а-я]*?)\s+на/g,' * ')
@@ -793,8 +1028,8 @@ function parseExpression(textRaw){
   t = fixNaDivision(t);
   // 2) "10% 5" → "10% * 5"
   t = insertStarAfterPercent(t);
-  // 2b) "две трети" → "2/3"
-  t = normalizeFractions(t);
+  t = stripRootsAndPowers(t);
+  t = stripFractionPhrases(t);
   // 3) Хвост после "*": множители через пробел/"и"/запятую
   t = expandMultiplicativeList(t);
   t = insertStarsAfterStar(t);
@@ -825,43 +1060,8 @@ function parseExpression(textRaw){
       continue;
     }
 
-    s = s.replace(/§half§/g,'1/2');
 
     let m;
-    if(m = s.match(/^sqrt\((.+)\)$/)){
-      const arg = extractNumberRu(m[1]);
-      out.push(`(${arg})**0.5`);
-      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
-      disp.push(prettyMathForDisplay(`sqrt(${arg})`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-    if(m = s.match(/^cbrt\((.+)\)$/)){
-      const arg = extractNumberRu(m[1]);
-      out.push(`(${arg})**(1/3)`);
-      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
-      disp.push(prettyMathForDisplay(`cbrt(${arg})`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-    if(m = s.match(/^root\((.+),(.+)\)$/)){
-      const base = extractNumberRu(m[1]);
-      const deg = extractNumberRu(m[2]);
-      out.push(`(${base})**(1/${deg})`);
-      if(disp.length && disp[disp.length-1].trim()==='×') disp.pop();
-      disp.push(prettyMathForDisplay(`root(${base},${deg})`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-    if(m = s.match(/^pow\((.+),(.*)\)$/)){
-      const base = extractNumberRu(m[1]);
-      const deg = extractNumberRu(m[2]);
-      out.push(`(${base})**(${deg})`);
-      disp.push(prettyMathForDisplay(`${base}^${deg}`));
-      pendingUnaryMinus=false;
-      continue;
-    }
-
     if(m = s.match(/^(.+?)\s*(%|процент(?:а|ов)?)$/)){
       const n = extractNumberRu(m[1]);
       out.push('(' + n + '/100)');
@@ -885,72 +1085,8 @@ function parseExpression(textRaw){
   return {display, sanitized};
 }
 
-// === КРАСИВОЕ ОТОБРАЖЕНИЕ: root/sqrt/cbrt -> знак корня, ^n -> надстрочные ===
-// перевод цифр в надстрочные символы для индекса и степеней
-function toSuperscript(str){
-  const map={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻','+':'⁺'};
-  return String(str).split('').map(ch=>map[ch]??ch).join('');
-}
-
-// парсит вызов функции вида name( ... ) с учётом вложенных скобок
-// возвращает { start, end, args[] }
-function parseCall(src,i,name){
-  const head=name+'(';
-  if(!src.startsWith(head,i)) return null;
-  let j=i+head.length,depth=1,args=[],buf='';
-  while(j<src.length && depth>0){
-    const ch=src[j];
-    if(ch==='('){ depth++; buf+=ch; }
-    else if(ch===')'){
-      depth--;
-      if(depth===0){ args.push(buf.trim()); break; }
-      buf+=ch;
-    }else if(ch===',' && depth===1){
-      args.push(buf.trim()); buf='';
-    }else{
-      buf+=ch;
-    }
-    j++;
-  }
-  return {start:i,end:j,args};
-}
-
-// вспомогательная: заменить все вызовы функции на форматтер
-function replaceCalls(src,name,formatter){
-  let out='',i=0;
-  while(i<src.length){
-    if(src.startsWith(name+'(',i)){
-      const call=parseCall(src,i,name);
-      if(call && call.args.length>0){
-        out+=formatter(call.args);
-        i=call.end+1; // позиция после закрывающей ')'
-        continue;
-      }
-    }
-    out+=src[i++];
-  }
-  return out;
-}
-
-// делает красивую строку для ДИСПЛЕЯ (не для вычисления!)
 function prettyMathForDisplay(src){
-  let s=String(src);
-
-  const wrap = x => /^[\d.]+$/.test(x.trim()) ? x : `(${x})`;
-
-  // 1) sqrt(x) -> √x
-  s=replaceCalls(s,'sqrt',([x])=>`√${wrap(x)}`);
-
-  // 2) cbrt(x) -> ∛x
-  s=replaceCalls(s,'cbrt',([x])=>`∛${wrap(x)}`);
-
-  // 3) root(x,n) -> ⁿ√x
-  s=replaceCalls(s,'root',([x,n])=>`${toSuperscript(n||2)}√${wrap(x)}`);
-
-  // 4) ^целое -> надстрочный индекс (только для простых целых степеней)
-  s=s.replace(/\^([\-+]?\d+)/g,(_,pow)=>toSuperscript(pow));
-
-  return s;
+  return String(src);
 }
 
 const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+')+')')(); if(!isFinite(v)||isNaN(v)) throw 0; return parseFloat(Number(v).toFixed(4)).toString(); };
@@ -1020,15 +1156,116 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     }
 
     /* ===== Вспомогательная склейка сегментов без дублей ===== */
+    function findSubsequenceIndex(haystackTokens, needleTokens){
+      const h = haystackTokens.map(tok=>tok.toLowerCase());
+      const n = needleTokens.map(tok=>tok.toLowerCase());
+      if(!n.length || n.length>h.length) return n.length===0 ? 0 : -1;
+      outer: for(let i=0;i<=h.length-n.length;i++){
+        for(let j=0;j<n.length;j++){
+          if(h[i+j]!==n[j]) continue outer;
+        }
+        return i;
+      }
+      return -1;
+    }
+
+    // Склеиваем группы тысяч вида "1 590" в "1590", чтобы новые сегменты
+    // без пробелов не считались отличными и не дублировали число.
+    function normalizeDigitGroups(str){
+      return String(str).replace(/(^|[^\d])(\d{1,3}(?:\s\d{3})+)(?!\d)/g, (_,lead,num)=>lead+num.replace(/\s+/g,''));
+    }
+
     function mergeSegmentsNoDup(arr){
+      const normTok = tok => String(tok||'').toLowerCase().replace(/[.,!?;:]/g,'');
+      const tokensEqual = (a,b)=>{
+        if(a.length!==b.length) return false;
+        for(let i=0;i<a.length;i++){
+          if(normTok(a[i])!==normTok(b[i])) return false;
+        }
+        return true;
+      };
+      const isOperatorToken = tok => {
+        const n = normTok(tok);
+        return n==='+'||n==='-'||n==='*'||n==='/'||
+               n==='плюс'||n==='минус'||n==='умножь'||n==='умножить'||
+               n==='помножь'||n==='помножить'||n==='дели'||n==='раздели'||
+               n==='разделить'||n==='подели'||n==='на';
+      };
       let acc='';
       for(const raw of arr){
-        let s=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
-        if(!s) continue;
+        let sRaw=String(raw||'').replace(/[−–—-]/g,'-').replace(/\s+/g,' ').trim();
+        if(!sRaw) continue;
+        let sTokensRaw = sRaw.split(' ').filter(Boolean);
+        let s = normalizeDigitGroups(sRaw);
+        if(acc) acc = normalizeDigitGroups(acc);
         if(!acc){ acc=s; continue; }
 
-        const accTokens = acc.split(' ');
-        const sTokens = s.split(' ');
+        const accTokens = acc.split(' ').filter(Boolean);
+
+        if(accTokens.length && sTokensRaw.length){
+          const occurrences=[];
+          for(let i=0;i<=sTokensRaw.length-accTokens.length;i++){
+            const rawChunk = sTokensRaw.slice(i, i+accTokens.length).join(' ');
+            const chunkTokens = normalizeDigitGroups(rawChunk).split(' ').filter(Boolean);
+            if(tokensEqual(chunkTokens, accTokens)) occurrences.push(i);
+          }
+          if(occurrences.length>1){
+            let changed=false;
+            for(let idx=occurrences.length-1; idx>=0; idx--){
+              const pos=occurrences[idx];
+              if(pos===occurrences[0]) continue;
+              const prevTok=sTokensRaw[pos-1];
+              if(prevTok && isOperatorToken(prevTok)) continue;
+              sTokensRaw.splice(pos, accTokens.length);
+              changed=true;
+            }
+            if(changed){
+              sRaw = sTokensRaw.join(' ');
+              s = normalizeDigitGroups(sRaw);
+            }
+          }
+        }
+
+        let sTokens = s.split(' ').filter(Boolean);
+
+        if(accTokens.length>=2 && sTokens.length){
+          const lastTokRaw = accTokens[accTokens.length-1] || '';
+          const opNorm = lastTokRaw.toLowerCase().replace(/[^+\-*/а-яё]/g,'');
+          if(opNorm==='-' || opNorm==='минус' || opNorm==='+' || opNorm==='плюс'){
+            const isNumPart = tok => {
+              const low = tok.toLowerCase().replace(/[.,!?;:]/g,'');
+              if(!low) return false;
+              if(low==='и') return true;
+              if(/^\d+(?:[.,]\d+)?$/.test(low)) return true;
+              if(UNITS[low]!==undefined || TENS[low]!==undefined || HUNS[low]!==undefined) return true;
+              if(/^тысяч/.test(low) || /^миллион/.test(low) || /^миллиард/.test(low) || low==='млн' || low==='млрд') return true;
+              return false;
+            };
+            let start = accTokens.length-2;
+            while(start>=0 && isNumPart(accTokens[start])) start--;
+            start++;
+            const prevPhraseTokens = accTokens.slice(start, accTokens.length-1);
+            const prevPhrase = prevPhraseTokens.join(' ');
+            const prevVal = Number(extractNumberRu(prevPhrase));
+            if(!isNaN(prevVal)){
+              let dropLen = 0;
+              for(let len=1; len<=sTokens.length; len++){
+                const prefix = sTokens.slice(0,len).join(' ');
+                const prefixVal = Number(extractNumberRu(prefix));
+                if(!isNaN(prefixVal) && prefixVal===prevVal){
+                  dropLen = len;
+                  break;
+                }
+              }
+              if(dropLen){
+                sTokens = sTokens.slice(dropLen);
+                s = sTokens.join(' ');
+                if(!sTokens.length) continue;
+              }
+            }
+          }
+        }
+
         let merged=false;
 
         for(let k=Math.min(sTokens.length, accTokens.length); k>0; k--){
@@ -1043,6 +1280,41 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           }
         }
         if(merged) continue;
+
+        const idxContainedInAcc = findSubsequenceIndex(accTokens, sTokens);
+        if(idxContainedInAcc !== -1){
+          // Новый сегмент полностью содержится в уже накопленной строке —
+          // игнорируем его, чтобы не дублировать числовую часть.
+          continue;
+        }
+
+        const idxAccInsideNew = findSubsequenceIndex(sTokens, accTokens);
+        if(idxAccInsideNew !== -1){
+          // Новый сегмент включает предыдущий. Оставляем его целиком, но сначала
+          // уберём подряд идущие повторы предыдущей фразы без операторов между ними,
+          // иначе получим "300 + 5 300 + 5".
+          const occurrences=[];
+          for(let i=0;i<=sTokens.length-accTokens.length;i++){
+            const chunk=sTokens.slice(i,i+accTokens.length);
+            if(tokensEqual(chunk, accTokens)) occurrences.push(i);
+          }
+          if(occurrences.length>1){
+            let changed=false;
+            for(let idxIdx=occurrences.length-1; idxIdx>=0; idxIdx--){
+              const pos=occurrences[idxIdx];
+              if(pos===idxAccInsideNew) continue;
+              const prevTok=sTokens[pos-1];
+              if(prevTok && isOperatorToken(prevTok)) continue;
+              sTokens.splice(pos, accTokens.length);
+              changed=true;
+            }
+            if(changed){
+              s=sTokens.join(' ');
+            }
+          }
+          acc = s;
+          continue;
+        }
 
         const tail = accTokens.slice(-8).join(' ').trim();
         if (tail && s.startsWith(tail)) acc = acc + s.slice(tail.length);
@@ -1098,7 +1370,17 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           rec.onend   = ()=>{ clearSilence(); if(!sessionActive) return; stopSession(); };
       }
 
-        function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; configure(); try{ rec.start(); }catch{} }
+        function startSession(){
+          if(sessionActive) return;
+          sessionActive=true;
+          UI.setListening(true);
+          fitFullText('');
+          if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; }
+          lastPreview = { display:'', out:'' };
+          buffer='';
+          configure();
+          try{ rec.start(); }catch{}
+        }
       function stopSession(){ if(!sessionActive) return; sessionActive=false; clearSilence(); try{ rec && rec.stop(); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
 
       recognizer.mode='web'; recognizer.available=true;
@@ -1129,7 +1411,15 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
           }, ()=>{ if(sessionActive){ setTimeout(loopStart, 150); } }, { language:'ru-RU', matches:8, showPartial:true, showPopup:false });
         }
 
-          function startSession(){ if(sessionActive) return; sessionActive=true; UI.setListening(true); fitFullText(''); if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; } buffer=''; lastChunk='';
+          function startSession(){
+            if(sessionActive) return;
+            sessionActive=true;
+            UI.setListening(true);
+            fitFullText('');
+            if(UI.expr){ UI.expr.textContent=''; UI.expr.scrollLeft=0; }
+            lastPreview = { display:'', out:'' };
+            buffer='';
+            lastChunk='';
           rec.hasPermission(has=>{ const go=()=>{ loopStart(); }; if(has) go(); else rec.requestPermission(go, ()=> UI.msg('Нет доступа к микрофону.')); }, ()=> UI.msg('Ошибка проверки разрешений.'));
         }
         function stopSession(){ clearSilence(); if(!sessionActive) return; sessionActive=false; try{ rec.stopListening(()=>{},()=>{}); }catch{} UI.setListening(false); if(lastPreview.display){ pushHistory(lastPreview.display,lastPreview.out); } }
