@@ -721,6 +721,7 @@
       return map;
     })();
     const DIGITWORD={'ноль':'0','один':'1','одна':'1','два':'2','две':'2','три':'3','четыре':'4','пять':'5','шесть':'6','семь':'7','восемь':'8','девять':'9'};
+    const SCALE_ALLOW_POSTFIX = new Set(['тысяч','тысячи','миллионы','миллионов','млн','миллиарды','миллиардов','млрд']);
 
     function tokenizeRu(s){
       s = String(s).replace(/[.,!?;:(){}\[\]]/g,' ').trim();
@@ -729,6 +730,23 @@
     }
 
     // Свёртка слов → число (масштабы устойчиво)
+    function readSmallNumberGroup(tokens, startIndex){
+      let value = 0;
+      let consumed = 0;
+      let matched = false;
+      for(let i=startIndex; i<tokens.length; i++){
+        const tok = tokens[i];
+        if (tok === 'и'){ consumed++; continue; }
+        if (/^\d+$/.test(tok)) { value += parseInt(tok,10); consumed++; matched=true; continue; }
+        if (tok === 'полтора' || tok === 'полторы'){ value += 1.5; consumed++; matched=true; continue; }
+        if (HUNS[tok]  !== undefined){ value += HUNS[tok];  consumed++; matched=true; continue; }
+        if (TENS[tok]  !== undefined){ value += TENS[tok];  consumed++; matched=true; continue; }
+        if (UNITS[tok] !== undefined){ value += UNITS[tok]; consumed++; matched=true; continue; }
+        break;
+      }
+      return {value, consumed, matched};
+    }
+
     function wordsToNumber(str){
       const norm = foldCompoundHundreds(normalizeNumeralTypos(str));
       const tokens = tokenizeRu(norm);
@@ -737,7 +755,8 @@
       let group = 0;  // текущая группа (<=999)
       let matched = false;
 
-      for (let w of tokens){
+      for (let i=0; i<tokens.length; i++){
+        let w = tokens[i];
         if (w === 'и') continue;
 
         if (/^\d+$/.test(w)) { group += parseInt(w,10); matched=true; continue; }
@@ -747,9 +766,23 @@
         if (TENS[w]  !== undefined) { group += TENS[w];  matched=true; continue; }
         if (UNITS[w] !== undefined) { group += UNITS[w]; matched=true; continue; }
 
-        if (SCALE[w] !== undefined){
-          if (group === 0) group = 1;          // «миллион» без числа → 1*
-          total += group * SCALE[w];
+        const scale = SCALE[w];
+        if (scale !== undefined){
+          let localGroup = group;
+          if (localGroup === 0 && SCALE_ALLOW_POSTFIX.has(w)){
+            const {value:lookValue, consumed, matched:lookMatched} = readSmallNumberGroup(tokens, i+1);
+            if (lookMatched){
+              const nextTok = tokens[i+1+consumed];
+              const nextScale = nextTok ? SCALE[nextTok] : undefined;
+              if (!nextScale || nextScale >= scale){
+                localGroup = lookValue;
+                matched = true;
+                i += consumed;
+              }
+            }
+          }
+          if (localGroup === 0) localGroup = 1; // «миллион» без числа → 1*
+          total += localGroup * scale;
           group = 0;
           matched = true;
           continue;
@@ -858,8 +891,15 @@
         const qStr = m[1].trim();
         const sw = m[2].toLowerCase();
         const mult = sw.startsWith('тыс')?1_000:(sw.startsWith('млрд')||sw.startsWith('миллиард')?1_000_000_000:1_000_000);
-        const q = (/^\d+$/.test(qStr)) ? parseInt(qStr,10) : wordsToNumber(qStr || 'один');
-        return String((q||1) * mult);
+        const qTokens = tokenizeRu(qStr);
+        const hasLargerScale = qTokens.some(tok=>{
+          const sc = SCALE[tok];
+          return sc !== undefined && sc >= mult;
+        });
+        if (!hasLargerScale){
+          const q = (/^\d+$/.test(qStr)) ? parseInt(qStr,10) : wordsToNumber(qStr || 'один');
+          return String((q||1) * mult);
+        }
       }
 
       // простое число цифрами
