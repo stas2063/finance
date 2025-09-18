@@ -647,9 +647,11 @@
       'десять':10,'одиннадцать':11,'двенадцать':12,'тринадцать':13,'четырнадцать':14,'пятнадцать':15,'шестнадцать':16,'семнадцать':17,'восемнадцать':18,'девятнадцать':19 };
     const TENS={ 'двадцать':20,'тридцать':30,'сорок':40,'пятьдесят':50,'шестьдесят':60,'семьдесят':70,'восемьдесят':80,'девяносто':90 };
     const HUNS={ 'сто':100,'двести':200,'триста':300,'четыреста':400,'пятьсот':500,'шестьсот':600,'семьсот':700,'восемьсот':800,'девятьсот':900 };
-    const SCALE={ 'тысяча':1_000,'тысячи':1_000,'тысяч':1_000,
-                  'млн':1_000_000,'миллион':1_000_000,'миллиона':1_000_000,'миллионов':1_000_000,'миллионом':1_000_000,'миллионам':1_000_000,'миллионами':1_000_000,
-                  'млрд':1_000_000_000,'миллиард':1_000_000_000,'миллиарда':1_000_000_000,'миллиардов':1_000_000_000,'миллиардом':1_000_000_000,'миллиардам':1_000_000_000,'миллиардами':1_000_000_000 };
+    const SCALE={
+      'тысяча':1_000,'тысячи':1_000,'тысяч':1_000,'тыс':1_000,'тыс.':1_000,
+      'миллион':1_000_000,'миллиона':1_000_000,'миллионов':1_000_000,'млн':1_000_000,'млн.':1_000_000,
+      'миллиард':1_000_000_000,'миллиарда':1_000_000_000,'миллиардов':1_000_000_000,'млрд':1_000_000_000,'млрд.':1_000_000_000
+    };
     const DIGITWORD={'ноль':'0','один':'1','одна':'1','два':'2','две':'2','три':'3','четыре':'4','пять':'5','шесть':'6','семь':'7','восемь':'8','девять':'9'};
 
     function tokenizeRu(s){
@@ -658,34 +660,43 @@
       return out;
     }
 
-    // Свёртка слов → число (масштабы устойчиво)
+    // Свёртка русских числительных в число с поддержкой масштабов
+    // Работает для: "один миллион пятьсот девяносто тысяч шестьсот семьдесят восемь" -> 1590678
+    // и "2 млн 3 тыс. 45" -> 2003045, а также с «полтора/полторы».
     function wordsToNumber(str){
       const norm = foldCompoundHundreds(normalizeNumeralTypos(str));
-      const tokens = tokenizeRu(norm);
+      const tokens = tokenizeRu(norm).map(t => t.toLowerCase());
 
-      let total = 0;  // сумма по масштабам
-      let group = 0;  // текущая группа (<=999)
-      let matched = false;
+      let total = 0;   // сумма по завершённым масштабным группам
+      let group = 0;   // текущая незавершённая группа <= 999 (может быть дробной из-за «полтора»)
+      let seen = false;
+
+      const pushScale = (scale) => {
+        const base = group === 0 ? 1 : group;
+        total += base * scale;
+        group = 0;
+      };
 
       for (let w of tokens){
-        if (w === 'и') continue;
+        if (w === 'и') { continue; }
 
-        if (/^\d+$/.test(w)) { group += parseInt(w,10); matched=true; continue; }
-        if (w === 'полтора' || w === 'полторы') { group += 1.5; matched=true; continue; }
+        if (/^\d+$/.test(w)) { group += parseInt(w,10); seen = true; continue; }
 
-        if (HUNS[w]  !== undefined) { group += HUNS[w];  matched=true; continue; }
-        if (TENS[w]  !== undefined) { group += TENS[w];  matched=true; continue; }
-        if (UNITS[w] !== undefined) { group += UNITS[w]; matched=true; continue; }
+        if (w === 'полтора' || w === 'полторы') { group += 1.5; seen = true; continue; }
 
-        if (SCALE[w] !== undefined){
-          if (group === 0) group = 1;          // «миллион» без числа → 1*
-          total += group * SCALE[w];
-          group = 0;
-          matched = true;
-          continue;
-        }
+        if (HUNS[w]  !== undefined) { group += HUNS[w];  seen = true; continue; }
+        if (TENS[w]  !== undefined) { group += TENS[w];  seen = true; continue; }
+        if (UNITS[w] !== undefined) { group += UNITS[w]; seen = true; continue; }
+
+        if (SCALE[w] !== undefined) { pushScale(SCALE[w]); seen = true; continue; }
+
+        if (w.startsWith('тысяч')) { pushScale(1_000); seen = true; continue; }
+        if (w.startsWith('миллион')) { pushScale(1_000_000); seen = true; continue; }
+        if (w.startsWith('миллиард')) { pushScale(1_000_000_000); seen = true; continue; }
       }
-      return matched ? total + group : NaN;
+
+      if (!seen) return NaN;
+      return total + group;
     }
 
     function extractNumberRu(input){
