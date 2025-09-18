@@ -1175,7 +1175,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
     // Склеиваем группы тысяч вида "1 590" в "1590", чтобы новые сегменты
     // без пробелов не считались отличными и не дублировали число.
     function normalizeDigitGroups(str){
-      return String(str).replace(/(^|[^\d])(\d{1,3}(?:\s\d{3})+)(?!\d)/g, (_,lead,num)=>lead+num.replace(/\s+/g,''));
+      return String(str).replace(/(^|[^\d])(\d+(?:\s\d{3})+)(?!\d)/g, (_,lead,num)=>lead+num.replace(/\s+/g,''));
     }
 
     function mergeSegmentsNoDup(arr){
@@ -1323,7 +1323,7 @@ const calc = s=>{ const v = Function('\"use strict\";return('+s.replace(/--/g,'+
         if (tail && s.startsWith(tail)) acc = acc + s.slice(tail.length);
         else if (!acc.endsWith(s)) acc = acc + ' ' + s;
       }
-      return acc.trim();
+      return normalizeDigitGroups(acc).trim();
     }
 
     /* ===== Распознавание (Web + Cordova) ===== */
